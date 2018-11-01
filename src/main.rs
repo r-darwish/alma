@@ -3,6 +3,7 @@ extern crate log;
 extern crate failure;
 extern crate simplelog;
 extern crate structopt;
+extern crate tempfile;
 extern crate which;
 
 mod error;
@@ -17,6 +18,7 @@ use std::process::{exit, Command};
 use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
+use tempfile::tempdir;
 use tool::Tool;
 
 static MKINITCPIO: &'static str = "MODULES=()
@@ -75,6 +77,8 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         return Err(ErrorKind::NotUSB.into());
     }
 
+    let mount_point = tempdir().context(ErrorKind::Creation)?;
+
     info!("Partitioning the disk");
     sgdisk
         .execute()
@@ -104,27 +108,28 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         .arg(format!("{}-part3", disk.display()))
         .run(ErrorKind::Creation)?;
 
-    info!("Mounting filesystems to /mnt/dok");
+    info!("Mounting filesystems to {}", mount_point.path().display());
     mount
         .execute()
         .arg(format!("{}-part3", disk.display()))
-        .arg("/mnt/dok")
+        .arg(mount_point.path())
         .run(ErrorKind::Creation)?;
 
-    fs::create_dir("/mnt/dok/boot").context(ErrorKind::Creation)?;
+    let boot_point = mount_point.path().join("boot");
+    fs::create_dir(&boot_point).context(ErrorKind::Creation)?;
 
     mount
         .execute()
         .arg(format!("{}-part2", disk.display()))
-        .arg("/mnt/dok/boot")
+        .arg(&boot_point)
         .run(ErrorKind::Creation)?;
 
     info!("Bootstrapping system");
     pacstrap
         .execute()
+        .arg("-c")
+        .arg(mount_point.path())
         .args(&[
-            "-c",
-            "/mnt/dok",
             "base",
             "grub",
             "efibootmgr",
@@ -135,27 +140,32 @@ fn create(disk: PathBuf) -> Result<(), Error> {
 
     arch_chroot
         .execute()
-        .args(&["/mnt/dok", "systemctl", "enable", "NetworkManager"])
+        .arg(mount_point.path())
+        .args(&["systemctl", "enable", "NetworkManager"])
         .run(ErrorKind::Creation)?;
 
     info!("Generating initramfs");
-    fs::write("/mnt/dok/etc/mkinitcpio.conf", MKINITCPIO).context(ErrorKind::Creation)?;
+    fs::write(mount_point.path().join("etc/mkinitcpio.conf"), MKINITCPIO)
+        .context(ErrorKind::Creation)?;
     arch_chroot
         .execute()
-        .args(&["/mnt/dok", "mkinitcpio", "-p", "linux"])
+        .arg(mount_point.path())
+        .args(&["mkinitcpio", "-p", "linux"])
         .run(ErrorKind::Creation)?;
 
     info!("Installing the Bootloader");
     arch_chroot
         .execute()
-        .args(&["/mnt/dok", "bash", "-c"])
+        .arg(mount_point.path())
+        .args(&["bash", "-c"])
         .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk.display()))
         .run(ErrorKind::Creation)?;
 
     info!("Unmounting filesystems");
     umount
         .execute()
-        .args(&["/mnt/dok/boot", "/mnt/dok"])
+        .arg(boot_point)
+        .arg(mount_point.path())
         .run(ErrorKind::Creation)?;
 
     sync.execute().run(ErrorKind::Creation)?;
