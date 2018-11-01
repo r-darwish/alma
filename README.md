@@ -12,7 +12,7 @@ stable version.
 ## Usage
 
 ``` shell
-# alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
+sudo alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 ```
 
 This will wipe the entire disk and create a bootable installation of Arch Linux. As a precaution,
