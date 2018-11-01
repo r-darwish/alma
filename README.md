@@ -26,10 +26,10 @@ perform further customizations before your first boot.
 This tool doesn't inspire to be a generic installer for Arch Linux. Instead, it does the minimum
 steps required to create a bootable USB with a few tweaks.
 
-#. Partition the disk as suggested [here](http://valleycat.org/linux/arch-usb.html). The last
+1. Partition the disk as suggested [here](http://valleycat.org/linux/arch-usb.html). The last
    partition will be formatted as BTRFS
-#. Bootstrap the system using `pacstrap -c`. The `-c` flag will use the host's cache instead the
+1. Bootstrap the system using `pacstrap -c`. The `-c` flag will use the host's cache instead the
 drive's cache, which will speed up things when you create multiple drives. This tool will install
 the base system, grub, intel-ucode, NetworkManager and btrfs-progs
-#. Generate initramfs without the `autodetect` hook
-#. Install GRUB in both legacy and UEFI modes
+1. Generate initramfs without the `autodetect` hook
+1. Install GRUB in both legacy and UEFI modes
