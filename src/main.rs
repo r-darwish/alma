@@ -123,6 +123,7 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             "intel-ucode",
             "networkmanager",
             "btrfs-progs",
+            "broadcom-wl",
         ]).run(ErrorKind::Pacstrap)?;
 
     let fstab = genfstab
