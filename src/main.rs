@@ -37,12 +37,23 @@ HOOKS=(base udev block filesystems keyboard fsck)";
 enum App {
     #[structopt(name = "create", about = "Create a new Arch Linux USB")]
     Create {
-        #[structopt(parse(from_os_str))]
+        #[structopt(
+            parse(from_os_str),
+            help = "Path starting with /dev/disk/by-id for the USB drive"
+        )]
         disk: PathBuf,
+
+        #[structopt(
+            short = "p",
+            long = "extra-packages",
+            value_name = "package",
+            help = "Additional pacakges to install"
+        )]
+        extra_packages: Vec<String>,
     },
 }
 
-fn create(disk: PathBuf) -> Result<(), Error> {
+fn create(disk: PathBuf, extra_packages: Vec<String>) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let sync = Tool::find("sync")?;
     let pacstrap = Tool::find("pacstrap")?;
@@ -125,7 +136,8 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             "networkmanager",
             "btrfs-progs",
             "broadcom-wl",
-        ]).run(ErrorKind::Pacstrap)?;
+        ]).args(extra_packages)
+        .run(ErrorKind::Pacstrap)?;
 
     let fstab = genfstab
         .execute()
@@ -189,7 +201,10 @@ fn main() {
     }
 
     let result = match app {
-        App::Create { disk } => create(disk),
+        App::Create {
+            disk,
+            extra_packages,
+        } => create(disk, extra_packages),
     };
 
     match result {

@@ -32,6 +32,9 @@ this tool will refuse to work with drive paths which don't start with `/dev/disk
 After the installation is done you can either boot from it immediately or use `arch-chroot` to
 perform further customizations before your first boot.
 
+### Flags
+* `-p / --extra-packages` - Specify extra packages to install. For example: `-p htop tmux`
+
 ## What exactly does it do?
 
 This tool doesn't aspire to be a generic installer for Arch Linux. Instead, it does the minimum
