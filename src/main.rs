@@ -33,7 +33,7 @@ FILES=()
 HOOKS=(base udev block filesystems keyboard fsck)";
 
 #[derive(StructOpt)]
-#[structopt(name = "alma", about = "Arch Linux Mobile Applicance")]
+#[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
 enum App {
     #[structopt(name = "create", about = "Create a new Arch Linux USB")]
     Create {
