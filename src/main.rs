@@ -6,6 +6,7 @@ extern crate simplelog;
 extern crate structopt;
 extern crate tempfile;
 extern crate which;
+use nix::sys::signal;
 
 mod error;
 mod mountstack;
@@ -165,12 +166,27 @@ fn create(disk: PathBuf) -> Result<(), Error> {
     Ok(())
 }
 
+extern "C" fn handle_sigint(_: i32) {
+    warn!("Interrupted");
+}
+
 fn main() {
     let app = App::from_args();
 
     CombinedLogger::init(vec![
         TermLogger::new(LevelFilter::Debug, Config::default()).unwrap(),
     ]).unwrap();
+
+    let sig_action = signal::SigAction::new(
+        signal::SigHandler::Handler(handle_sigint),
+        signal::SaFlags::empty(),
+        signal::SigSet::empty(),
+    );
+    unsafe {
+        signal::sigaction(signal::SIGINT, &sig_action).unwrap();
+        signal::sigaction(signal::SIGTERM, &sig_action).unwrap();
+        signal::sigaction(signal::SIGQUIT, &sig_action).unwrap();
+    }
 
     let result = match app {
         App::Create { disk } => create(disk),

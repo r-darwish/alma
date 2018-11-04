@@ -52,6 +52,7 @@ impl MountStack {
 impl Drop for MountStack {
     fn drop(&mut self) {
         while let Some(target) = self.targets.pop() {
+            debug!("Unmounting {}", target.display());
             if !umount(&target).is_ok() {
                 warn!("Unable to mount {}", target.display());
             };
