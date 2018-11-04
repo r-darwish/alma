@@ -44,7 +44,6 @@ enum App {
 fn create(disk: PathBuf) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let sync = Tool::find("sync")?;
-    let partprobe = Tool::find("partprobe")?;
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
     let genfstab = Tool::find("genfstab")?;
@@ -62,7 +61,7 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         return Err(ErrorKind::NotUSB.into());
     }
 
-    let mount_point = tempdir().context(ErrorKind::Creation)?;
+    let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
 
     info!("Partitioning the disk");
     sgdisk
@@ -76,8 +75,7 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             "--typecode=1:EF02",
             "--typecode=2:EF00",
         ]).arg(&disk)
-        .run(ErrorKind::Creation)?;
-    partprobe.execute().run(ErrorKind::Creation)?;
+        .run(ErrorKind::Partitioning)?;
 
     thread::sleep(Duration::from_millis(1000));
 
@@ -86,12 +84,12 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         .execute()
         .arg("-F32")
         .arg(format!("{}-part2", disk.display()))
-        .run(ErrorKind::Creation)?;
+        .run(ErrorKind::Formatting)?;
     mkbtrfs
         .execute()
         .arg("-f")
         .arg(format!("{}-part3", disk.display()))
-        .run(ErrorKind::Creation)?;
+        .run(ErrorKind::Formatting)?;
 
     info!("Mounting filesystems to {}", mount_point.path().display());
     mount_stack
@@ -100,10 +98,10 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             &mount_point.path(),
             Filesystem::Btrfs,
             Some("compress=zstd"),
-        ).context(ErrorKind::Creation)?;
+        ).context(ErrorKind::Mounting)?;
 
     let boot_point = mount_point.path().join("boot");
-    fs::create_dir(&boot_point).context(ErrorKind::Creation)?;
+    fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
 
     mount_stack
         .mount(
@@ -111,7 +109,7 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             &boot_point,
             Filesystem::Vfat,
             None,
-        ).context(ErrorKind::Creation)?;
+        ).context(ErrorKind::Mounting)?;
 
     info!("Bootstrapping system");
     pacstrap
@@ -125,31 +123,31 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             "intel-ucode",
             "networkmanager",
             "btrfs-progs",
-        ]).run(ErrorKind::Creation)?;
+        ]).run(ErrorKind::Pacstrap)?;
 
     let fstab = genfstab
         .execute()
         .arg("-U")
         .arg(mount_point.path())
-        .run_text_output(ErrorKind::Creation)?
+        .run_text_output(ErrorKind::Fstab)?
         .replace("relatime", "noatime");
     debug!("fstab:\n{}", fstab);
-    fs::write(mount_point.path().join("etc/fstab"), fstab).context(ErrorKind::Creation)?;
+    fs::write(mount_point.path().join("etc/fstab"), fstab).context(ErrorKind::Fstab)?;
 
     arch_chroot
         .execute()
         .arg(mount_point.path())
         .args(&["systemctl", "enable", "NetworkManager"])
-        .run(ErrorKind::Creation)?;
+        .run(ErrorKind::PostInstallation)?;
 
     info!("Generating initramfs");
     fs::write(mount_point.path().join("etc/mkinitcpio.conf"), MKINITCPIO)
-        .context(ErrorKind::Creation)?;
+        .context(ErrorKind::Initramfs)?;
     arch_chroot
         .execute()
         .arg(mount_point.path())
         .args(&["mkinitcpio", "-p", "linux"])
-        .run(ErrorKind::Creation)?;
+        .run(ErrorKind::Initramfs)?;
 
     info!("Installing the Bootloader");
     arch_chroot
@@ -157,11 +155,11 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         .arg(mount_point.path())
         .args(&["bash", "-c"])
         .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk.display()))
-        .run(ErrorKind::Creation)?;
+        .run(ErrorKind::Bootloader)?;
 
     info!("Unmounting filesystems");
     drop(mount_stack);
-    sync.execute().run(ErrorKind::Creation)?;
+    sync.execute().run(ErrorKind::Sync)?;
 
     Ok(())
 }

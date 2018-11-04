@@ -16,8 +16,38 @@ pub enum ErrorKind {
     #[fail(display = "Could not find {}", _0)]
     NoTool(&'static str),
 
+    #[fail(display = "Error creating a temporary directory")]
+    TmpDirError,
+
     #[fail(display = "Partitioning error")]
-    Creation,
+    Partitioning,
+
+    #[fail(display = "Error formatting filesystems")]
+    Formatting,
+
+    #[fail(display = "Error mounting filesystems")]
+    Mounting,
+
+    #[fail(display = "Error creating the boot directory")]
+    CreateBoot,
+
+    #[fail(display = "Pacstrap error")]
+    Pacstrap,
+
+    #[fail(display = "fstab error")]
+    Fstab,
+
+    #[fail(display = "Post installation configuration error")]
+    PostInstallation,
+
+    #[fail(display = "Initramfs error")]
+    Initramfs,
+
+    #[fail(display = "Bootloader error")]
+    Bootloader,
+
+    #[fail(display = "Error calling sync")]
+    Sync,
 }
 
 impl Fail for Error {
