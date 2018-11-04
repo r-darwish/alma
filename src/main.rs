@@ -14,7 +14,8 @@ use failure::{Fail, ResultExt};
 use simplelog::*;
 use std::fs;
 use std::path::PathBuf;
-use std::process::{exit, Command};
+use std::process::{exit, Command, ExitStatus};
+use std::str;
 use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -26,12 +27,18 @@ BINARIES=()
 FILES=()
 HOOKS=(base udev block filesystems keyboard fsck)";
 
-#[derive(Fail, Debug)]
-#[fail(display = "Process failed")]
-pub struct ProcessFailed;
+#[derive(Debug, Fail)]
+enum ProcessError {
+    #[fail(display = "Bad exit code: {}", _0)]
+    BadExitCode(ExitStatus),
+
+    #[fail(display = "Process output isn't valid UTF-8")]
+    InvalidUtf8,
+}
 
 trait CommandExt {
     fn run(&mut self, context: ErrorKind) -> Result<(), Error>;
+    fn run_text_output(&mut self, context: ErrorKind) -> Result<String, Error>;
 }
 
 impl CommandExt for Command {
@@ -39,10 +46,30 @@ impl CommandExt for Command {
         let exit_status = self.spawn().context(context)?.wait().context(context)?;
 
         if !exit_status.success() {
-            return Err(ProcessFailed {}.context(context).into());
+            return Err(ProcessError::BadExitCode(exit_status)
+                .context(context)
+                .into());
         }
 
         Ok(())
+    }
+
+    fn run_text_output(&mut self, context: ErrorKind) -> Result<String, Error> {
+        let output = self.output().context(context)?;
+
+        if !output.status.success() {
+            let error = str::from_utf8(&output.stderr).unwrap_or("[INVALID UTF8]");
+            error!("{}", error);
+            return Err(ProcessError::BadExitCode(output.status)
+                .context(context)
+                .into());
+        }
+
+        Ok(String::from(
+            str::from_utf8(&output.stdout)
+                .map_err(|_| ProcessError::InvalidUtf8)
+                .context(context)?,
+        ))
     }
 }
 
@@ -62,6 +89,7 @@ fn create(disk: PathBuf) -> Result<(), Error> {
     let partprobe = Tool::find("partprobe")?;
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
+    let genfstab = Tool::find("genfstab")?;
     let mount = Tool::find("mount")?;
     let umount = Tool::find("umount")?;
     let mkfat = Tool::find("mkfs.fat")?;
@@ -137,6 +165,15 @@ fn create(disk: PathBuf) -> Result<(), Error> {
             "networkmanager",
             "btrfs-progs",
         ]).run(ErrorKind::Creation)?;
+
+    let fstab = genfstab
+        .execute()
+        .arg("-U")
+        .arg(mount_point.path())
+        .run_text_output(ErrorKind::Creation)?
+        .replace("relatime", "noatime");
+    debug!("fstab:\n{}", fstab);
+    fs::write(mount_point.path().join("etc/fstab"), fstab).context(ErrorKind::Creation)?;
 
     arch_chroot
         .execute()

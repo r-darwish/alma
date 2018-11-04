@@ -14,7 +14,7 @@ This tool should be ran from an exiting Arch Linux installations. It depends on 
 
 * sgdisk
 * partprobe
-* pacstrap and arch-chroot
+* Arch install scripts
 * mkfs.fat
 * mkfs.btrfs
 
