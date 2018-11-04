@@ -1,16 +1,19 @@
 #[macro_use]
 extern crate log;
 extern crate failure;
+extern crate nix;
 extern crate simplelog;
 extern crate structopt;
 extern crate tempfile;
 extern crate which;
 
 mod error;
+mod mountstack;
 mod tool;
 
 use error::*;
 use failure::{Fail, ResultExt};
+use mountstack::{Filesystem, MountStack};
 use simplelog::*;
 use std::fs;
 use std::path::PathBuf;
@@ -90,10 +93,9 @@ fn create(disk: PathBuf) -> Result<(), Error> {
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
     let genfstab = Tool::find("genfstab")?;
-    let mount = Tool::find("mount")?;
-    let umount = Tool::find("umount")?;
     let mkfat = Tool::find("mkfs.fat")?;
     let mkbtrfs = Tool::find("mkfs.btrfs")?;
+    let mut mount_stack = MountStack::new();
 
     if !(disk.starts_with("/dev/disk/by-id")
         && (disk
@@ -137,20 +139,24 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         .run(ErrorKind::Creation)?;
 
     info!("Mounting filesystems to {}", mount_point.path().display());
-    mount
-        .execute()
-        .arg(format!("{}-part3", disk.display()))
-        .arg(mount_point.path())
-        .run(ErrorKind::Creation)?;
+    mount_stack
+        .mount(
+            &PathBuf::from(format!("{}-part3", disk.display())),
+            &mount_point.path(),
+            Filesystem::Btrfs,
+            Some("compress=zstd"),
+        ).context(ErrorKind::Creation)?;
 
     let boot_point = mount_point.path().join("boot");
     fs::create_dir(&boot_point).context(ErrorKind::Creation)?;
 
-    mount
-        .execute()
-        .arg(format!("{}-part2", disk.display()))
-        .arg(&boot_point)
-        .run(ErrorKind::Creation)?;
+    mount_stack
+        .mount(
+            &PathBuf::from(format!("{}-part2", disk.display())),
+            &boot_point,
+            Filesystem::Vfat,
+            None,
+        ).context(ErrorKind::Creation)?;
 
     info!("Bootstrapping system");
     pacstrap
@@ -199,12 +205,7 @@ fn create(disk: PathBuf) -> Result<(), Error> {
         .run(ErrorKind::Creation)?;
 
     info!("Unmounting filesystems");
-    umount
-        .execute()
-        .arg(boot_point)
-        .arg(mount_point.path())
-        .run(ErrorKind::Creation)?;
-
+    drop(mount_stack);
     sync.execute().run(ErrorKind::Creation)?;
 
     Ok(())
