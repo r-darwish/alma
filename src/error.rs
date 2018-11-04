@@ -48,6 +48,9 @@ pub enum ErrorKind {
 
     #[fail(display = "Error calling sync")]
     Sync,
+
+    #[fail(display = "Error caused by the interactive mode")]
+    Interactive,
 }
 
 impl Fail for Error {

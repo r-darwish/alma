@@ -43,23 +43,21 @@ SystemMaxUse=16M
 enum App {
     #[structopt(name = "create", about = "Create a new Arch Linux USB")]
     Create {
-        #[structopt(
-            parse(from_os_str),
-            help = "Path starting with /dev/disk/by-id for the USB drive"
-        )]
+        /// Path starting with /dev/disk/by-id for the USB drive
+        #[structopt(parse(from_os_str),)]
         disk: PathBuf,
 
-        #[structopt(
-            short = "p",
-            long = "extra-packages",
-            value_name = "package",
-            help = "Additional pacakges to install"
-        )]
+        /// Additional pacakges to install
+        #[structopt(short = "p", long = "extra-packages", value_name = "package",)]
         extra_packages: Vec<String>,
+
+        /// Enter interactive chroot before unmounting the drive
+        #[structopt(short = "i", long = "interactive")]
+        interactive: bool,
     },
 }
 
-fn create(disk: PathBuf, extra_packages: Vec<String>) -> Result<(), Error> {
+fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let sync = Tool::find("sync")?;
     let pacstrap = Tool::find("pacstrap")?;
@@ -183,6 +181,14 @@ fn create(disk: PathBuf, extra_packages: Vec<String>) -> Result<(), Error> {
         .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk.display()))
         .run(ErrorKind::Bootloader)?;
 
+    if interactive {
+        info!("Dropping you to chroot. Do as you wish to customize the installation");
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .run(ErrorKind::Interactive)?;
+    }
+
     info!("Unmounting filesystems");
     drop(mount_stack);
     sync.execute().run(ErrorKind::Sync)?;
@@ -216,7 +222,8 @@ fn main() {
         App::Create {
             disk,
             extra_packages,
-        } => create(disk, extra_packages),
+            interactive,
+        } => create(disk, extra_packages, interactive),
     };
 
     match result {
