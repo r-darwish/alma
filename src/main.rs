@@ -32,6 +32,12 @@ BINARIES=()
 FILES=()
 HOOKS=(base udev block filesystems keyboard fsck)";
 
+static JOURNALD_CONF: &'static str = "
+[Journal]
+Storage=volatile
+SystemMaxUse=16M
+";
+
 #[derive(StructOpt)]
 #[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
 enum App {
@@ -153,6 +159,12 @@ fn create(disk: PathBuf, extra_packages: Vec<String>) -> Result<(), Error> {
         .arg(mount_point.path())
         .args(&["systemctl", "enable", "NetworkManager"])
         .run(ErrorKind::PostInstallation)?;
+
+    info!("Configuring journald");
+    fs::write(
+        mount_point.path().join("etc/systemd/journald.conf"),
+        JOURNALD_CONF,
+    ).context(ErrorKind::PostInstallation)?;
 
     info!("Generating initramfs");
     fs::write(mount_point.path().join("etc/mkinitcpio.conf"), MKINITCPIO)
