@@ -1,13 +1,12 @@
 # ALMA - Arch Linux Mobile Appliance
 
-This tools installs Arch Linux into a USB drive, making it a customized live Arch Linux bootable
+This tool installs Arch Linux into a USB drive, making it a customized live Arch Linux bootable
 drive. It was inspired by [this](http://valleycat.org/linux/arch-usb.html) article. The USB drive
 should be bootable both by UEFI and legacy boot.
 
 ## Installation
 
-You should build the project using `cargo build`. An AUR package will be provided with the first
-stable version.
+You can either build the project using cargo build or install the `alma` package from AUR.
 
 ## Requirements
 
@@ -18,6 +17,8 @@ This tool should be ran from an exiting Arch Linux installations. It depends on 
 * pacstrap and arch-chroot
 * mkfs.fat
 * mkfs.btrfs
+
+Dependencies will be handled for you if you install alma from AUR.
 
 ## Usage
 
