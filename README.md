@@ -34,6 +34,7 @@ perform further customizations before your first boot.
 
 ### Flags
 * `-p / --extra-packages` - Specify extra packages to install. For example: `-p htop tmux`
+* `-i / --interactive` - Drop you into interactive chroot to perform further customization
 
 ## What exactly does it do?
 
