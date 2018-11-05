@@ -42,22 +42,25 @@ SystemMaxUse=16M
 #[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
 enum App {
     #[structopt(name = "create", about = "Create a new Arch Linux USB")]
-    Create {
-        /// Path starting with /dev/disk/by-id for the USB drive
-        #[structopt(parse(from_os_str),)]
-        disk: PathBuf,
-
-        /// Additional pacakges to install
-        #[structopt(short = "p", long = "extra-packages", value_name = "package",)]
-        extra_packages: Vec<String>,
-
-        /// Enter interactive chroot before unmounting the drive
-        #[structopt(short = "i", long = "interactive")]
-        interactive: bool,
-    },
+    Create(CreateCommand),
 }
 
-fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Result<(), Error> {
+#[derive(StructOpt)]
+struct CreateCommand {
+    /// Path starting with /dev/disk/by-id for the USB drive
+    #[structopt(parse(from_os_str),)]
+    disk: PathBuf,
+
+    /// Additional pacakges to install
+    #[structopt(short = "p", long = "extra-packages", value_name = "package",)]
+    extra_packages: Vec<String>,
+
+    /// Enter interactive chroot before unmounting the drive
+    #[structopt(short = "i", long = "interactive")]
+    interactive: bool,
+}
+
+fn create(command: CreateCommand) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let sync = Tool::find("sync")?;
     let pacstrap = Tool::find("pacstrap")?;
@@ -67,8 +70,9 @@ fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Resu
     let mkbtrfs = Tool::find("mkfs.btrfs")?;
     let mut mount_stack = MountStack::new();
 
-    if !(disk.starts_with("/dev/disk/by-id")
-        && (disk
+    if !(command.disk.starts_with("/dev/disk/by-id")
+        && (command
+            .disk
             .file_name()
             .and_then(|s| s.to_str())
             .filter(|ref f| f.starts_with("usb-"))
@@ -90,7 +94,7 @@ fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Resu
             "--largest-new=3",
             "--typecode=1:EF02",
             "--typecode=2:EF00",
-        ]).arg(&disk)
+        ]).arg(&command.disk)
         .run(ErrorKind::Partitioning)?;
 
     thread::sleep(Duration::from_millis(1000));
@@ -99,18 +103,18 @@ fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Resu
     mkfat
         .execute()
         .arg("-F32")
-        .arg(format!("{}-part2", disk.display()))
+        .arg(format!("{}-part2", command.disk.display()))
         .run(ErrorKind::Formatting)?;
     mkbtrfs
         .execute()
         .arg("-f")
-        .arg(format!("{}-part3", disk.display()))
+        .arg(format!("{}-part3", command.disk.display()))
         .run(ErrorKind::Formatting)?;
 
     info!("Mounting filesystems to {}", mount_point.path().display());
     mount_stack
         .mount(
-            &PathBuf::from(format!("{}-part3", disk.display())),
+            &PathBuf::from(format!("{}-part3", command.disk.display())),
             &mount_point.path(),
             Filesystem::Btrfs,
             Some("compress=zstd"),
@@ -121,7 +125,7 @@ fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Resu
 
     mount_stack
         .mount(
-            &PathBuf::from(format!("{}-part2", disk.display())),
+            &PathBuf::from(format!("{}-part2", command.disk.display())),
             &boot_point,
             Filesystem::Vfat,
             None,
@@ -140,7 +144,7 @@ fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Resu
             "networkmanager",
             "btrfs-progs",
             "broadcom-wl",
-        ]).args(extra_packages)
+        ]).args(command.extra_packages)
         .run(ErrorKind::Pacstrap)?;
 
     let fstab = genfstab
@@ -178,10 +182,10 @@ fn create(disk: PathBuf, extra_packages: Vec<String>, interactive: bool) -> Resu
         .execute()
         .arg(mount_point.path())
         .args(&["bash", "-c"])
-        .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk.display()))
+        .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", command.disk.display()))
         .run(ErrorKind::Bootloader)?;
 
-    if interactive {
+    if command.interactive {
         info!("Dropping you to chroot. Do as you wish to customize the installation");
         arch_chroot
             .execute()
@@ -219,11 +223,7 @@ fn main() {
     }
 
     let result = match app {
-        App::Create {
-            disk,
-            extra_packages,
-            interactive,
-        } => create(disk, extra_packages, interactive),
+        App::Create(command) => create(command),
     };
 
     match result {
