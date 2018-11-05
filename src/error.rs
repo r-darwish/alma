@@ -46,9 +46,6 @@ pub enum ErrorKind {
     #[fail(display = "Bootloader error")]
     Bootloader,
 
-    #[fail(display = "Error calling sync")]
-    Sync,
-
     #[fail(display = "Error caused by the interactive mode")]
     Interactive,
 }

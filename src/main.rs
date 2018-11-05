@@ -62,7 +62,6 @@ struct CreateCommand {
 
 fn create(command: CreateCommand) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
-    let sync = Tool::find("sync")?;
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
     let genfstab = Tool::find("genfstab")?;
@@ -195,7 +194,6 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
     info!("Unmounting filesystems");
     drop(mount_stack);
-    sync.execute().run(ErrorKind::Sync)?;
 
     Ok(())
 }
