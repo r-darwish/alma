@@ -78,7 +78,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             .filter(|ref f| f.starts_with("usb-"))
             .is_some()))
     {
-        return Err(ErrorKind::NotUSB.into());
+        Err(ErrorKind::NotUSB)?;
     }
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
