@@ -5,7 +5,7 @@ use std::str;
 
 #[derive(Debug, Fail)]
 enum ProcessError {
-    #[fail(display = "Bad exit code: {}", _0)]
+    #[fail(display = "{}", _0)]
     BadExitCode(ExitStatus),
 
     #[fail(display = "Process output isn't valid UTF-8")]
