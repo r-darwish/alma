@@ -43,6 +43,9 @@ SystemMaxUse=16M
 enum App {
     #[structopt(name = "create", about = "Create a new Arch Linux USB")]
     Create(CreateCommand),
+
+    #[structopt(name = "chroot", about = "Chroot into exiting Live USB")]
+    Chroot(ChrootCommand),
 }
 
 #[derive(StructOpt)]
@@ -58,6 +61,13 @@ struct CreateCommand {
     /// Enter interactive chroot before unmounting the drive
     #[structopt(short = "i", long = "interactive")]
     interactive: bool,
+}
+
+#[derive(StructOpt)]
+struct ChrootCommand {
+    /// Path starting with /dev/disk/by-id for the USB drive
+    #[structopt(parse(from_os_str),)]
+    disk: PathBuf,
 }
 
 fn create(command: CreateCommand) -> Result<(), Error> {
@@ -196,6 +206,50 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     Ok(())
 }
 
+fn chroot(command: ChrootCommand) -> Result<(), Error> {
+    let arch_chroot = Tool::find("arch-chroot")?;
+
+    if !(command.disk.starts_with("/dev/disk/by-id")
+        && (command
+            .disk
+            .file_name()
+            .and_then(|s| s.to_str())
+            .filter(|ref f| f.starts_with("usb-"))
+            .is_some()))
+    {
+        Err(ErrorKind::NotUSB)?;
+    }
+
+    let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
+    let boot_point = mount_point.path().join("boot");
+    let mut mount_stack = MountStack::new();
+
+    info!("Mounting filesystems to {}", mount_point.path().display());
+    mount_stack
+        .mount(
+            &PathBuf::from(format!("{}-part3", command.disk.display())),
+            &mount_point.path(),
+            Filesystem::Btrfs,
+            Some("compress=zstd"),
+        ).context(ErrorKind::Mounting)?;
+
+    mount_stack
+        .mount(
+            &PathBuf::from(format!("{}-part2", command.disk.display())),
+            &boot_point,
+            Filesystem::Vfat,
+            None,
+        ).context(ErrorKind::Mounting)?;
+
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .run(ErrorKind::Interactive)?;
+
+    info!("Unmounting filesystems");
+    Ok(())
+}
+
 extern "C" fn handle_sigint(_: i32) {
     warn!("Interrupted");
 }
@@ -220,6 +274,7 @@ fn main() {
 
     let result = match app {
         App::Create(command) => create(command),
+        App::Chroot(command) => chroot(command),
     };
 
     match result {

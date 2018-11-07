@@ -22,6 +22,7 @@ Dependencies will be handled for you if you install alma from AUR.
 
 ## Usage
 
+### Creation
 ``` shell
 sudo alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 ```
@@ -31,6 +32,12 @@ this tool will refuse to work with drive paths which don't start with `/dev/disk
 
 After the installation is done you can either boot from it immediately or use `arch-chroot` to
 perform further customizations before your first boot.
+
+### Chrooting to exiting Live USB
+
+``` shell
+sudo alma chroot /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
+```
 
 ### Flags
 * `-p / --extra-packages` - Specify extra packages to install. For example: `-p htop tmux`
