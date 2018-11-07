@@ -67,7 +67,6 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     let genfstab = Tool::find("genfstab")?;
     let mkfat = Tool::find("mkfs.fat")?;
     let mkbtrfs = Tool::find("mkfs.btrfs")?;
-    let mut mount_stack = MountStack::new();
 
     if !(command.disk.starts_with("/dev/disk/by-id")
         && (command
@@ -81,6 +80,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     }
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
+    let boot_point = mount_point.path().join("boot");
+    let mut mount_stack = MountStack::new();
 
     info!("Partitioning the disk");
     sgdisk
@@ -119,7 +120,6 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             Some("compress=zstd"),
         ).context(ErrorKind::Mounting)?;
 
-    let boot_point = mount_point.path().join("boot");
     fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
 
     mount_stack
@@ -193,8 +193,6 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     }
 
     info!("Unmounting filesystems");
-    drop(mount_stack);
-
     Ok(())
 }
 
