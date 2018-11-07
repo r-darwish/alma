@@ -70,7 +70,7 @@ struct ChrootCommand {
     disk: PathBuf,
 }
 
-fn create(command: CreateCommand) -> Result<(), Error> {
+fn create(command: &CreateCommand) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
@@ -153,7 +153,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             "networkmanager",
             "btrfs-progs",
             "broadcom-wl",
-        ]).args(command.extra_packages)
+        ]).args(&command.extra_packages)
         .run(ErrorKind::Pacstrap)?;
 
     let fstab = genfstab
@@ -206,7 +206,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     Ok(())
 }
 
-fn chroot(command: ChrootCommand) -> Result<(), Error> {
+fn chroot(command: &ChrootCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
 
     if !(command.disk.starts_with("/dev/disk/by-id")
@@ -273,8 +273,8 @@ fn main() {
     }
 
     let result = match app {
-        App::Create(command) => create(command),
-        App::Chroot(command) => chroot(command),
+        App::Create(command) => create(&command),
+        App::Chroot(command) => chroot(&command),
     };
 
     match result {
