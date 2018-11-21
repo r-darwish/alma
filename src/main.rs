@@ -127,7 +127,7 @@ fn create(command: &CreateCommand) -> Result<(), Error> {
             &PathBuf::from(format!("{}-part3", command.disk.display())),
             &mount_point.path(),
             Filesystem::Btrfs,
-            Some("compress=zstd"),
+            Some("compress=lzo"),
         ).context(ErrorKind::Mounting)?;
 
     fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
@@ -230,7 +230,7 @@ fn chroot(command: &ChrootCommand) -> Result<(), Error> {
             &PathBuf::from(format!("{}-part3", command.disk.display())),
             &mount_point.path(),
             Filesystem::Btrfs,
-            Some("compress=zstd"),
+            Some("compress=lzo"),
         ).context(ErrorKind::Mounting)?;
 
     mount_stack
