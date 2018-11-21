@@ -41,7 +41,16 @@ SystemMaxUse=16M
 
 #[derive(StructOpt)]
 #[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
-enum App {
+struct App {
+    #[structopt(short = "v", long = "verbose", help = "Verbose output")]
+    verbose: bool,
+
+    #[structopt(subcommand)]
+    cmd: Command,
+}
+
+#[derive(StructOpt)]
+enum Command {
     #[structopt(name = "create", about = "Create a new Arch Linux USB")]
     Create(CreateCommand),
 
@@ -247,9 +256,12 @@ extern "C" fn handle_sigint(_: i32) {
 fn main() {
     let app = App::from_args();
 
-    CombinedLogger::init(vec![
-        TermLogger::new(LevelFilter::Debug, Config::default()).unwrap(),
-    ]).unwrap();
+    let log_level = if app.verbose {
+        LevelFilter::Debug
+    } else {
+        LevelFilter::Info
+    };
+    CombinedLogger::init(vec![TermLogger::new(log_level, Config::default()).unwrap()]).unwrap();
 
     let sig_action = signal::SigAction::new(
         signal::SigHandler::Handler(handle_sigint),
@@ -262,9 +274,9 @@ fn main() {
         signal::sigaction(signal::SIGQUIT, &sig_action).unwrap();
     }
 
-    let result = match app {
-        App::Create(command) => create(command),
-        App::Chroot(command) => chroot(command),
+    let result = match app.cmd {
+        Command::Create(command) => create(command),
+        Command::Chroot(command) => chroot(command),
     };
 
     match result {
