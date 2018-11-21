@@ -129,7 +129,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             &PathBuf::from(&root_partition),
             &mount_point.path(),
             Filesystem::Btrfs,
-            Some("compress=lzo"),
+            None,
         ).context(ErrorKind::Mounting)?;
 
     fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
@@ -223,7 +223,7 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
             &root_partition,
             &mount_point.path(),
             Filesystem::Btrfs,
-            Some("compress=lzo"),
+            None,
         ).context(ErrorKind::Mounting)?;
 
     let boot_partition = disk.partition_device_path(2)?;
