@@ -55,3 +55,7 @@ the base system, grub, intel-ucode, NetworkManager and btrfs-progs
 1. Generate initramfs without the `autodetect` hook
 1. Set NetworkManager to start at boot
 1. Install GRUB in both legacy and UEFI modes
+
+## Similar projects
+
+* [NomadBSD](http://nomadbsd.org/)
