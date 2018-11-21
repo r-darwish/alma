@@ -27,8 +27,7 @@ Dependencies will be handled for you if you install alma from AUR.
 sudo alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 ```
 
-This will wipe the entire disk and create a bootable installation of Arch Linux. As a precaution,
-this tool will refuse to work with drive paths which don't start with `/dev/disk/by-id/usb-`.
+This will wipe the entire disk and create a bootable installation of Arch Linux.
 
 After the installation is done you can either boot from it immediately or use `arch-chroot` to
 perform further customizations before your first boot.

@@ -8,10 +8,17 @@ pub struct Error {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
-    #[fail(
-        display = "Provided Path does not point to a USB device. Make sure you specify a file matching /dev/disk/by-id/usb-*"
-    )]
-    NotUSB,
+    #[fail(display = "Error quering information about the block device")]
+    DeviceQuery,
+
+    #[fail(display = "Invalid device name")]
+    InvalidDeviceName,
+
+    #[fail(display = "The given block device is not removable")]
+    NotRemovableDevice,
+
+    #[fail(display = "Partition {} does not exist", _0)]
+    NoSuchPartition(u8),
 
     #[fail(display = "Could not find {}", _0)]
     NoTool(&'static str),

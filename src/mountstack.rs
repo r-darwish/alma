@@ -1,3 +1,4 @@
+use log::{debug, warn};
 use nix;
 use nix::mount::{mount, umount, MsFlags};
 use std::path::Path;

@@ -1,6 +1,5 @@
-#[macro_use]
-extern crate log;
 extern crate failure;
+extern crate log;
 extern crate nix;
 extern crate simplelog;
 extern crate structopt;
@@ -8,6 +7,7 @@ extern crate tempfile;
 extern crate which;
 use nix::sys::signal;
 
+mod block;
 mod error;
 mod mountstack;
 mod process;
@@ -15,6 +15,7 @@ mod tool;
 
 use error::*;
 use failure::{Fail, ResultExt};
+use log::{debug, error, info, warn};
 use mountstack::{Filesystem, MountStack};
 use process::CommandExt;
 use simplelog::*;
@@ -70,7 +71,7 @@ struct ChrootCommand {
     disk: PathBuf,
 }
 
-fn create(command: &CreateCommand) -> Result<(), Error> {
+fn create(command: CreateCommand) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
@@ -78,22 +79,20 @@ fn create(command: &CreateCommand) -> Result<(), Error> {
     let mkfat = Tool::find("mkfs.fat")?;
     let mkbtrfs = Tool::find("mkfs.btrfs")?;
 
-    if !(command.disk.starts_with("/dev/disk/by-id")
-        && (command
-            .disk
-            .file_name()
-            .and_then(|s| s.to_str())
-            .filter(|ref f| f.starts_with("usb-"))
-            .is_some()))
-    {
-        Err(ErrorKind::NotUSB)?;
+    let disk = block::BlockDevice::from_path(command.disk)?;
+
+    if !disk.removable()? {
+        Err(ErrorKind::NotRemovableDevice)?;
     }
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
     let boot_point = mount_point.path().join("boot");
     let mut mount_stack = MountStack::new();
+    let disk_path = disk.device_path();
 
     info!("Partitioning the disk");
+    debug!("{:?}", disk_path);
+
     sgdisk
         .execute()
         .args(&[
@@ -104,27 +103,30 @@ fn create(command: &CreateCommand) -> Result<(), Error> {
             "--largest-new=3",
             "--typecode=1:EF02",
             "--typecode=2:EF00",
-        ]).arg(&command.disk)
+        ]).arg(&disk_path)
         .run(ErrorKind::Partitioning)?;
 
     thread::sleep(Duration::from_millis(1000));
 
     info!("Formatting filesystems");
+    let boot_partition = disk.partition_device_path(2)?;
     mkfat
         .execute()
         .arg("-F32")
-        .arg(format!("{}-part2", command.disk.display()))
+        .arg(&boot_partition)
         .run(ErrorKind::Formatting)?;
+
+    let root_partition = disk.partition_device_path(3)?;
     mkbtrfs
         .execute()
         .arg("-f")
-        .arg(format!("{}-part3", command.disk.display()))
+        .arg(&root_partition)
         .run(ErrorKind::Formatting)?;
 
     info!("Mounting filesystems to {}", mount_point.path().display());
     mount_stack
         .mount(
-            &PathBuf::from(format!("{}-part3", command.disk.display())),
+            &PathBuf::from(&root_partition),
             &mount_point.path(),
             Filesystem::Btrfs,
             Some("compress=lzo"),
@@ -133,12 +135,8 @@ fn create(command: &CreateCommand) -> Result<(), Error> {
     fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
 
     mount_stack
-        .mount(
-            &PathBuf::from(format!("{}-part2", command.disk.display())),
-            &boot_point,
-            Filesystem::Vfat,
-            None,
-        ).context(ErrorKind::Mounting)?;
+        .mount(&boot_partition, &boot_point, Filesystem::Vfat, None)
+        .context(ErrorKind::Mounting)?;
 
     info!("Bootstrapping system");
     pacstrap
@@ -191,7 +189,7 @@ fn create(command: &CreateCommand) -> Result<(), Error> {
         .execute()
         .arg(mount_point.path())
         .args(&["bash", "-c"])
-        .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", command.disk.display()))
+        .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk_path.display()))
         .run(ErrorKind::Bootloader)?;
 
     if command.interactive {
@@ -206,18 +204,12 @@ fn create(command: &CreateCommand) -> Result<(), Error> {
     Ok(())
 }
 
-fn chroot(command: &ChrootCommand) -> Result<(), Error> {
+fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
+    let disk = block::BlockDevice::from_path(command.disk)?;
 
-    if !(command.disk.starts_with("/dev/disk/by-id")
-        && (command
-            .disk
-            .file_name()
-            .and_then(|s| s.to_str())
-            .filter(|ref f| f.starts_with("usb-"))
-            .is_some()))
-    {
-        Err(ErrorKind::NotUSB)?;
+    if !disk.removable()? {
+        Err(ErrorKind::NotRemovableDevice)?;
     }
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
@@ -225,21 +217,19 @@ fn chroot(command: &ChrootCommand) -> Result<(), Error> {
     let mut mount_stack = MountStack::new();
 
     info!("Mounting filesystems to {}", mount_point.path().display());
+    let root_partition = disk.partition_device_path(3)?;
     mount_stack
         .mount(
-            &PathBuf::from(format!("{}-part3", command.disk.display())),
+            &root_partition,
             &mount_point.path(),
             Filesystem::Btrfs,
             Some("compress=lzo"),
         ).context(ErrorKind::Mounting)?;
 
+    let boot_partition = disk.partition_device_path(2)?;
     mount_stack
-        .mount(
-            &PathBuf::from(format!("{}-part2", command.disk.display())),
-            &boot_point,
-            Filesystem::Vfat,
-            None,
-        ).context(ErrorKind::Mounting)?;
+        .mount(&boot_partition, &boot_point, Filesystem::Vfat, None)
+        .context(ErrorKind::Mounting)?;
 
     arch_chroot
         .execute()
@@ -273,8 +263,8 @@ fn main() {
     }
 
     let result = match app {
-        App::Create(command) => create(&command),
-        App::Chroot(command) => chroot(&command),
+        App::Create(command) => create(command),
+        App::Chroot(command) => chroot(command),
     };
 
     match result {

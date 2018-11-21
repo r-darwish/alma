@@ -1,5 +1,6 @@
 use super::error::*;
 use failure::{Fail, ResultExt};
+use log::error;
 use std::process::{Command, ExitStatus};
 use std::str;
 
