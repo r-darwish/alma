@@ -55,6 +55,9 @@ pub enum ErrorKind {
 
     #[fail(display = "Error caused by the interactive mode")]
     Interactive,
+
+    #[fail(display = "Failed umounting filesystems")]
+    UmountFailure,
 }
 
 impl Fail for Error {

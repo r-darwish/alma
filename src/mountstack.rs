@@ -1,3 +1,5 @@
+use super::error::{Error, ErrorKind};
+use failure::Fail;
 use log::{debug, warn};
 use nix;
 use nix::mount::{mount, umount, MsFlags};
@@ -48,15 +50,24 @@ impl<'a> MountStack<'a> {
         self.targets.push(target);
         Ok(())
     }
+
+    pub fn umount(&mut self) -> Result<(), Error> {
+        let mut result = Ok(());
+
+        while let Some(target) = self.targets.pop() {
+            debug!("Unmounting {}", target.display());
+            if let Err(e) = umount(target) {
+                warn!("Unable to umount {}: {}", target.display(), e);
+                result = Err(Error::from(e.context(ErrorKind::UmountFailure)));
+            };
+        }
+
+        result
+    }
 }
 
 impl<'a> Drop for MountStack<'a> {
     fn drop(&mut self) {
-        while let Some(target) = self.targets.pop() {
-            debug!("Unmounting {}", target.display());
-            if !umount(target).is_ok() {
-                warn!("Unable to umount {}", target.display());
-            };
-        }
+        self.umount().ok();
     }
 }

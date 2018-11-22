@@ -210,6 +210,10 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     }
 
     info!("Unmounting filesystems");
+    mount_stack.umount()?;
+
+    info!("Installation succeeded. It is now safe to unplug your device.");
+
     Ok(())
 }
 
