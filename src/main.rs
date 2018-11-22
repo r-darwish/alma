@@ -104,7 +104,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             "-Z",
             "-o",
             "--new=1::+10M",
-            "--new=2::+500M",
+            "--new=2::+150M",
             "--largest-new=3",
             "--typecode=1:EF02",
             "--typecode=2:EF00",
