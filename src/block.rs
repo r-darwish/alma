@@ -23,7 +23,12 @@ impl BlockDevice {
             path, real_path, device_name
         );
 
-        Ok(Self { name: device_name })
+        let _self = Self { name: device_name };
+        if !(_self.is_removable()? || _self.is_loop_device()) {
+            return Err(ErrorKind::DangerousDevice)?;
+        }
+
+        Ok(_self)
     }
 
     fn sys_path(&self) -> PathBuf {
@@ -32,7 +37,7 @@ impl BlockDevice {
         path
     }
 
-    pub fn removable(&self) -> Result<bool, Error> {
+    fn is_removable(&self) -> Result<bool, Error> {
         let mut path = self.sys_path();
         path.push("removable");
 
@@ -41,6 +46,12 @@ impl BlockDevice {
         debug!("{:?} -> {}", path, result);
 
         Ok(result == "1\n")
+    }
+
+    fn is_loop_device(&self) -> bool {
+        let mut path = self.sys_path();
+        path.push("loop");
+        path.exists()
     }
 
     pub fn device_path(&self) -> PathBuf {

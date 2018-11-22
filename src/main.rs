@@ -62,7 +62,7 @@ enum Command {
 struct CreateCommand {
     /// Path starting with /dev/disk/by-id for the USB drive
     #[structopt(parse(from_os_str),)]
-    disk: PathBuf,
+    block_device: PathBuf,
 
     /// Additional pacakges to install
     #[structopt(short = "p", long = "extra-packages", value_name = "package",)]
@@ -77,7 +77,7 @@ struct CreateCommand {
 struct ChrootCommand {
     /// Path starting with /dev/disk/by-id for the USB drive
     #[structopt(parse(from_os_str),)]
-    disk: PathBuf,
+    block_device: PathBuf,
 }
 
 fn create(command: CreateCommand) -> Result<(), Error> {
@@ -88,18 +88,14 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     let mkfat = Tool::find("mkfs.fat")?;
     let mkbtrfs = Tool::find("mkfs.btrfs")?;
 
-    let disk = block::BlockDevice::from_path(command.disk)?;
-
-    if !disk.removable()? {
-        Err(ErrorKind::NotRemovableDevice)?;
-    }
+    let block_device = block::BlockDevice::from_path(command.block_device)?;
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
     let boot_point = mount_point.path().join("boot");
     let mut mount_stack = MountStack::new();
-    let disk_path = disk.device_path();
+    let disk_path = block_device.device_path();
 
-    info!("Partitioning the disk");
+    info!("Partitioning the block device");
     debug!("{:?}", disk_path);
 
     sgdisk
@@ -118,14 +114,14 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     thread::sleep(Duration::from_millis(1000));
 
     info!("Formatting filesystems");
-    let boot_partition = disk.partition_device_path(2)?;
+    let boot_partition = block_device.partition_device_path(2)?;
     mkfat
         .execute()
         .arg("-F32")
         .arg(&boot_partition)
         .run(ErrorKind::Formatting)?;
 
-    let root_partition = disk.partition_device_path(3)?;
+    let root_partition = block_device.partition_device_path(3)?;
     mkbtrfs
         .execute()
         .arg("-f")
@@ -219,18 +215,14 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
 fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
-    let disk = block::BlockDevice::from_path(command.disk)?;
-
-    if !disk.removable()? {
-        Err(ErrorKind::NotRemovableDevice)?;
-    }
+    let block_device = block::BlockDevice::from_path(command.block_device)?;
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
     let boot_point = mount_point.path().join("boot");
     let mut mount_stack = MountStack::new();
 
     info!("Mounting filesystems to {}", mount_point.path().display());
-    let root_partition = disk.partition_device_path(3)?;
+    let root_partition = block_device.partition_device_path(3)?;
     mount_stack
         .mount(
             &root_partition,
@@ -239,7 +231,7 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
             None,
         ).context(ErrorKind::Mounting)?;
 
-    let boot_partition = disk.partition_device_path(2)?;
+    let boot_partition = block_device.partition_device_path(2)?;
     mount_stack
         .mount(&boot_partition, &boot_point, Filesystem::Vfat, None)
         .context(ErrorKind::Mounting)?;

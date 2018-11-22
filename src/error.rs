@@ -14,8 +14,8 @@ pub enum ErrorKind {
     #[fail(display = "Invalid device name")]
     InvalidDeviceName,
 
-    #[fail(display = "The given block device is not removable")]
-    NotRemovableDevice,
+    #[fail(display = "The given block device is neither removable nor a loop device")]
+    DangerousDevice,
 
     #[fail(display = "Partition {} does not exist", _0)]
     NoSuchPartition(u8),

@@ -27,7 +27,8 @@ Dependencies will be handled for you if you install alma from AUR.
 sudo alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 ```
 
-This will wipe the entire disk and create a bootable installation of Arch Linux.
+This will wipe the entire disk and create a bootable installation of Arch Linux. You can use either
+removable devices or loop devices. As a precaution, ALMA will not wipe non-removable devices.
 
 After the installation is done you can either boot from it immediately or use `arch-chroot` to
 perform further customizations before your first boot.
