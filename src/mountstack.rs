@@ -3,6 +3,7 @@ use failure::Fail;
 use log::{debug, warn};
 use nix;
 use nix::mount::{mount, umount, MsFlags};
+use std::borrow::Cow;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ impl Filesystem {
 }
 
 pub struct MountStack<'a> {
-    targets: Vec<&'a Path>,
+    targets: Vec<Cow<'a, Path>>,
 }
 
 impl<'a> MountStack<'a> {
@@ -32,17 +33,19 @@ impl<'a> MountStack<'a> {
     }
 
     #[must_use]
-    pub fn mount(
+    pub fn mount<T: Into<Cow<'a, Path>>>(
         &mut self,
         source: &Path,
-        target: &'a Path,
+        target: T,
         filesystem: Filesystem,
         options: Option<&str>,
     ) -> nix::Result<()> {
+        let target = target.into();
+
         debug!("Mounting {:?} ({:?}) to {:?}", source, filesystem, target);
         mount(
             Some(source),
-            target,
+            target.as_ref(),
             Some(filesystem.to_type()),
             MsFlags::empty(),
             options,
@@ -56,7 +59,7 @@ impl<'a> MountStack<'a> {
 
         while let Some(target) = self.targets.pop() {
             debug!("Unmounting {}", target.display());
-            if let Err(e) = umount(target) {
+            if let Err(e) = umount(target.as_ref()) {
                 warn!("Unable to umount {}: {}", target.display(), e);
                 result = Err(Error::from(e.context(ErrorKind::UmountFailure)));
             };

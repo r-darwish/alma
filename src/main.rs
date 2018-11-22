@@ -7,16 +7,17 @@ extern crate tempfile;
 extern crate which;
 use nix::sys::signal;
 
+mod alma;
 mod block;
 mod error;
 mod mountstack;
 mod process;
 mod tool;
 
+use alma::ALMA;
 use error::*;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
-use mountstack::{Filesystem, MountStack};
 use process::CommandExt;
 use simplelog::*;
 use std::fs;
@@ -91,8 +92,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     let block_device = block::BlockDevice::from_path(command.block_device)?;
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
-    let boot_point = mount_point.path().join("boot");
-    let mut mount_stack = MountStack::new();
+
     let disk_path = block_device.device_path();
 
     info!("Partitioning the block device");
@@ -128,20 +128,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         .arg(&root_partition)
         .run(ErrorKind::Formatting)?;
 
-    info!("Mounting filesystems to {}", mount_point.path().display());
-    mount_stack
-        .mount(
-            &PathBuf::from(&root_partition),
-            &mount_point.path(),
-            Filesystem::Btrfs,
-            None,
-        ).context(ErrorKind::Mounting)?;
-
-    fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
-
-    mount_stack
-        .mount(&boot_partition, &boot_point, Filesystem::Vfat, None)
-        .context(ErrorKind::Mounting)?;
+    let alma = ALMA::new(block_device);
+    let mut mount_stack = alma.mount(mount_point.path())?;
 
     info!("Bootstrapping system");
     pacstrap
@@ -218,23 +206,8 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let block_device = block::BlockDevice::from_path(command.block_device)?;
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
-    let boot_point = mount_point.path().join("boot");
-    let mut mount_stack = MountStack::new();
-
-    info!("Mounting filesystems to {}", mount_point.path().display());
-    let root_partition = block_device.partition_device_path(3)?;
-    mount_stack
-        .mount(
-            &root_partition,
-            &mount_point.path(),
-            Filesystem::Btrfs,
-            None,
-        ).context(ErrorKind::Mounting)?;
-
-    let boot_partition = block_device.partition_device_path(2)?;
-    mount_stack
-        .mount(&boot_partition, &boot_point, Filesystem::Vfat, None)
-        .context(ErrorKind::Mounting)?;
+    let alma = ALMA::new(block_device);
+    let mut mount_stack = alma.mount(mount_point.path())?;
 
     arch_chroot
         .execute()
@@ -242,6 +215,8 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
         .run(ErrorKind::Interactive)?;
 
     info!("Unmounting filesystems");
+    mount_stack.umount()?;
+
     Ok(())
 }
 
