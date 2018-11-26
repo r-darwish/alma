@@ -47,7 +47,7 @@ impl<'a> MountStack<'a> {
             Some(source),
             target.as_ref(),
             Some(filesystem.to_type()),
-            MsFlags::empty(),
+            MsFlags::MS_NOATIME,
             options,
         )?;
         self.targets.push(target);

@@ -81,6 +81,14 @@ struct ChrootCommand {
     block_device: PathBuf,
 }
 
+fn fix_fstab(fstab: String) -> String {
+    fstab
+        .lines()
+        .filter(|line| !line.contains("swap") && !line.starts_with('#'))
+        .collect::<Vec<&str>>()
+        .join("\n")
+}
+
 fn create(command: CreateCommand) -> Result<(), Error> {
     let sgdisk = Tool::find("sgdisk")?;
     let pacstrap = Tool::find("pacstrap")?;
@@ -147,12 +155,13 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         ]).args(&command.extra_packages)
         .run(ErrorKind::Pacstrap)?;
 
-    let fstab = genfstab
-        .execute()
-        .arg("-U")
-        .arg(mount_point.path())
-        .run_text_output(ErrorKind::Fstab)?
-        .replace("relatime", "noatime");
+    let fstab = fix_fstab(
+        genfstab
+            .execute()
+            .arg("-U")
+            .arg(mount_point.path())
+            .run_text_output(ErrorKind::Fstab)?,
+    );
     debug!("fstab:\n{}", fstab);
     fs::write(mount_point.path().join("etc/fstab"), fstab).context(ErrorKind::Fstab)?;
 
@@ -257,7 +266,7 @@ fn main() {
         Err(error) => {
             error!("{}", error);
             if let Some(cause) = error.cause() {
-                error!("  {}", cause);
+                error!("Caused by: {}", cause);
             }
             exit(1);
         }
