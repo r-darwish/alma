@@ -81,7 +81,7 @@ struct ChrootCommand {
     block_device: PathBuf,
 }
 
-fn fix_fstab(fstab: String) -> String {
+fn fix_fstab(fstab: &str) -> String {
     fstab
         .lines()
         .filter(|line| !line.contains("swap") && !line.starts_with('#'))
@@ -156,7 +156,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         .run(ErrorKind::Pacstrap)?;
 
     let fstab = fix_fstab(
-        genfstab
+        &genfstab
             .execute()
             .arg("-U")
             .arg(mount_point.path())
