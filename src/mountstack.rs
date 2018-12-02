@@ -8,14 +8,14 @@ use std::path::Path;
 
 #[derive(Debug)]
 pub enum Filesystem {
-    Btrfs,
+    Ext4,
     Vfat,
 }
 
 impl Filesystem {
     fn to_type(&self) -> &'static str {
         match self {
-            Filesystem::Btrfs => "btrfs",
+            Filesystem::Ext4 => "ext4",
             Filesystem::Vfat => "vfat",
         }
     }

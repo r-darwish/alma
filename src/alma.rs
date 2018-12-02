@@ -32,7 +32,7 @@ impl<'a> ALMA<'a> {
 
         info!("Mounting filesystems to {}", path.display());
         mount_stack
-            .mount(&root_device, path, Filesystem::Btrfs, None)
+            .mount(&root_device, path, Filesystem::Ext4, None)
             .context(ErrorKind::Mounting)?;
 
         let boot_point = path.join("boot");

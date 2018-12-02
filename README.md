@@ -16,7 +16,7 @@ This tool should be ran from an exiting Arch Linux installations. It depends on 
 * partprobe
 * Arch install scripts
 * mkfs.fat
-* mkfs.btrfs
+* mkfs.ext4
 * *Optional*: cryptsetup
 
 Dependencies will be handled for you if you install alma from AUR.
@@ -51,10 +51,10 @@ This tool doesn't aspire to be a generic installer for Arch Linux. Instead, it d
 steps required to create a bootable USB with a few tweaks.
 
 1. Partition the disk as suggested [here](http://valleycat.org/linux/arch-usb.html). The last
-   partition will be formatted as BTRFS
+   partition will be formatted as ext4
 1. Bootstrap the system using `pacstrap -c`. The `-c` flag will use the host's cache instead the
 drive's cache, which will speed up things when you create multiple drives. This tool will install
-the base system, grub, intel-ucode, NetworkManager and btrfs-progs
+the base system, grub, intel-ucode and NetworkManager
 1. Generate initramfs without the `autodetect` hook
 1. Set NetworkManager to start at boot
 1. Install GRUB in both legacy and UEFI modes

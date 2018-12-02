@@ -107,7 +107,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
     let genfstab = Tool::find("genfstab")?;
     let mkfat = Tool::find("mkfs.fat")?;
-    let mkbtrfs = Tool::find("mkfs.btrfs")?;
+    let mkext4 = Tool::find("mkfs.ext4")?;
     let cryptsetup = if command.encrypted_root {
         Some(Tool::find("cryptsetup")?)
     } else {
@@ -163,9 +163,9 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         None
     };
 
-    mkbtrfs
+    mkext4
         .execute()
-        .arg("-f")
+        .arg("-F")
         .arg(if let Some(device) = &encrypted_root {
             device.path()
         } else {
@@ -186,7 +186,6 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             "efibootmgr",
             "intel-ucode",
             "networkmanager",
-            "btrfs-progs",
             "broadcom-wl",
         ]).args(&command.extra_packages)
         .run(ErrorKind::Pacstrap)?;
