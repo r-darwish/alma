@@ -153,6 +153,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
     let root_partition = block_device.partition_device_path(3)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
+        info!("Encrypting the root filesystem");
         EncryptedDevice::prepare(&cryptsetup, &root_partition)?;
         Some(EncryptedDevice::open(
             cryptsetup,
