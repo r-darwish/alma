@@ -54,7 +54,7 @@ impl<'a> MountStack<'a> {
         Ok(())
     }
 
-    pub fn umount(&mut self) -> Result<(), Error> {
+    fn _umount(&mut self) -> Result<(), Error> {
         let mut result = Ok(());
 
         while let Some(target) = self.targets.pop() {
@@ -67,10 +67,14 @@ impl<'a> MountStack<'a> {
 
         result
     }
+
+    pub fn umount(mut self) -> Result<(), Error> {
+        self._umount()
+    }
 }
 
 impl<'a> Drop for MountStack<'a> {
     fn drop(&mut self) {
-        self.umount().ok();
+        self._umount().ok();
     }
 }
