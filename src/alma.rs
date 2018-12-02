@@ -1,31 +1,39 @@
 use super::block::BlockDevice;
+use super::cryptsetup::EncryptedDevice;
 use super::error::{Error, ErrorKind};
 use super::mountstack::{Filesystem, MountStack};
 use failure::ResultExt;
-use log::info;
+use log::{debug, info};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub struct ALMA {
+pub struct ALMA<'a> {
     block: BlockDevice,
+    encrypted_root: Option<EncryptedDevice<'a>>,
 }
 
-impl ALMA {
-    pub fn new(block: BlockDevice) -> Self {
-        Self { block }
+impl<'a> ALMA<'a> {
+    pub fn new(block: BlockDevice, encrypted_root: Option<EncryptedDevice<'a>>) -> Self {
+        Self {
+            block,
+            encrypted_root,
+        }
     }
 
-    pub fn mount<'a>(&self, path: &'a Path) -> Result<MountStack<'a>, Error> {
+    pub fn mount<'b>(&self, path: &'b Path) -> Result<MountStack<'b>, Error> {
         let mut mount_stack = MountStack::new();
+
+        let root_device = if let Some(encrypted_root) = &self.encrypted_root {
+            PathBuf::from(encrypted_root.path())
+        } else {
+            self.block.partition_device_path(3)?
+        };
+        debug!("Root partition: {}", root_device.display());
 
         info!("Mounting filesystems to {}", path.display());
         mount_stack
-            .mount(
-                &PathBuf::from(&self.block.partition_device_path(3)?),
-                path,
-                Filesystem::Btrfs,
-                None,
-            ).context(ErrorKind::Mounting)?;
+            .mount(&root_device, path, Filesystem::Btrfs, None)
+            .context(ErrorKind::Mounting)?;
 
         let boot_point = path.join("boot");
         if !boot_point.exists() {

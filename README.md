@@ -17,6 +17,7 @@ This tool should be ran from an exiting Arch Linux installations. It depends on 
 * Arch install scripts
 * mkfs.fat
 * mkfs.btrfs
+* *Optional*: cryptsetup
 
 Dependencies will be handled for you if you install alma from AUR.
 
@@ -42,6 +43,7 @@ sudo alma chroot /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 ### Flags
 * `-p / --extra-packages` - Specify extra packages to install. For example: `-p htop tmux`
 * `-i / --interactive` - Drop you into interactive chroot to perform further customization
+* `-e / --encrypted-root` - Encrypt the root filesystem.
 
 ## What exactly does it do?
 

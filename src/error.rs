@@ -58,6 +58,15 @@ pub enum ErrorKind {
 
     #[fail(display = "Failed umounting filesystems")]
     UmountFailure,
+
+    #[fail(display = "Error setting up an encrypted device")]
+    LuksSetup,
+
+    #[fail(display = "Error opening the encrypted device")]
+    LuksOpen,
+
+    #[fail(display = "Error closing the encrypted device")]
+    LuksClose,
 }
 
 impl Fail for Error {

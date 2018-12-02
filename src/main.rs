@@ -9,18 +9,21 @@ use nix::sys::signal;
 
 mod alma;
 mod block;
+mod cryptsetup;
 mod error;
 mod mountstack;
 mod process;
 mod tool;
 
 use alma::ALMA;
+use cryptsetup::EncryptedDevice;
 use error::*;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
 use process::CommandExt;
 use simplelog::*;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 use std::thread;
@@ -32,7 +35,7 @@ use tool::Tool;
 static MKINITCPIO: &'static str = "MODULES=()
 BINARIES=()
 FILES=()
-HOOKS=(base udev block filesystems keyboard fsck)";
+HOOKS=(base udev keyboard consolefont block encrypt filesystems keyboard fsck)";
 
 static JOURNALD_CONF: &'static str = "
 [Journal]
@@ -43,7 +46,8 @@ SystemMaxUse=16M
 #[derive(StructOpt)]
 #[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
 struct App {
-    #[structopt(short = "v", long = "verbose", help = "Verbose output")]
+    /// Verbose output
+    #[structopt(short = "v", long = "verbose")]
     verbose: bool,
 
     #[structopt(subcommand)]
@@ -72,6 +76,10 @@ struct CreateCommand {
     /// Enter interactive chroot before unmounting the drive
     #[structopt(short = "i", long = "interactive")]
     interactive: bool,
+
+    /// Encrypt the root partition
+    #[structopt(short = "e", long = "encrypted-root")]
+    encrypted_root: bool,
 }
 
 #[derive(StructOpt)]
@@ -79,6 +87,10 @@ struct ChrootCommand {
     /// Path starting with /dev/disk/by-id for the USB drive
     #[structopt(parse(from_os_str),)]
     block_device: PathBuf,
+
+    /// Open an encrypted root partition
+    #[structopt(short = "e", long = "encrypted-root")]
+    encrypted_root: bool,
 }
 
 fn fix_fstab(fstab: &str) -> String {
@@ -96,6 +108,16 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     let genfstab = Tool::find("genfstab")?;
     let mkfat = Tool::find("mkfs.fat")?;
     let mkbtrfs = Tool::find("mkfs.btrfs")?;
+    let cryptsetup = if command.encrypted_root {
+        Some(Tool::find("cryptsetup")?)
+    } else {
+        None
+    };
+    let blkid = if command.encrypted_root {
+        Some(Tool::find("blkid")?)
+    } else {
+        None
+    };
 
     let block_device = block::BlockDevice::from_path(command.block_device)?;
 
@@ -130,14 +152,28 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         .run(ErrorKind::Formatting)?;
 
     let root_partition = block_device.partition_device_path(3)?;
+    let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
+        EncryptedDevice::prepare(&cryptsetup, &root_partition)?;
+        Some(EncryptedDevice::open(
+            cryptsetup,
+            &root_partition,
+            "alma_root",
+        )?)
+    } else {
+        None
+    };
+
     mkbtrfs
         .execute()
         .arg("-f")
-        .arg(&root_partition)
-        .run(ErrorKind::Formatting)?;
+        .arg(if let Some(device) = &encrypted_root {
+            device.path()
+        } else {
+            &root_partition
+        }).run(ErrorKind::Formatting)?;
 
-    let alma = ALMA::new(block_device);
-    let mut mount_stack = alma.mount(mount_point.path())?;
+    let alma = ALMA::new(block_device, encrypted_root);
+    let mount_stack = alma.mount(mount_point.path())?;
 
     info!("Bootstrapping system");
     pacstrap
@@ -186,6 +222,30 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         .args(&["mkinitcpio", "-p", "linux"])
         .run(ErrorKind::Initramfs)?;
 
+    if cryptsetup.is_some() {
+        debug!("Setting up GRUB for an encrypted root partition");
+
+        let uuid = blkid
+            .unwrap()
+            .execute()
+            .arg(root_partition)
+            .args(&["-o", "value", "-s", "UUID"])
+            .run_text_output(ErrorKind::Partitioning)?;
+        let trimmed = uuid.trim();
+        debug!("Root partition UUID: {}", trimmed);
+
+        let mut grub_file = fs::OpenOptions::new()
+            .append(true)
+            .open(mount_point.path().join("etc/default/grub"))
+            .context(ErrorKind::Bootloader)?;
+
+        write!(
+            &mut grub_file,
+            "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID={}:luks_root\"",
+            trimmed
+        ).context(ErrorKind::Bootloader)?;
+    }
+
     info!("Installing the Bootloader");
     arch_chroot
         .execute()
@@ -205,18 +265,33 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     info!("Unmounting filesystems");
     mount_stack.umount()?;
 
-    info!("Installation succeeded. It is now safe to unplug your device.");
-
     Ok(())
 }
 
 fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
+    let cryptsetup = if command.encrypted_root {
+        Some(Tool::find("cryptsetup")?)
+    } else {
+        None
+    };
+
     let block_device = block::BlockDevice::from_path(command.block_device)?;
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
-    let alma = ALMA::new(block_device);
-    let mut mount_stack = alma.mount(mount_point.path())?;
+    let root_partition = block_device.partition_device_path(3)?;
+    let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
+        Some(EncryptedDevice::open(
+            cryptsetup,
+            &root_partition,
+            "alma_root",
+        )?)
+    } else {
+        None
+    };
+
+    let alma = ALMA::new(block_device, encrypted_root);
+    let mount_stack = alma.mount(mount_point.path())?;
 
     arch_chroot
         .execute()
