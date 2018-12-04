@@ -6,14 +6,14 @@ use nix::mount::{mount, umount, MsFlags};
 use std::borrow::Cow;
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Filesystem {
     Ext4,
     Vfat,
 }
 
 impl Filesystem {
-    fn to_type(&self) -> &'static str {
+    fn to_type(self) -> &'static str {
         match self {
             Filesystem::Ext4 => "ext4",
             Filesystem::Vfat => "vfat",

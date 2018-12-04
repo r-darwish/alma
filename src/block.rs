@@ -16,13 +16,14 @@ impl BlockDevice {
             .file_name()
             .and_then(|s| s.to_str())
             .map(String::from)
-            .ok_or(Error::from(ErrorKind::InvalidDeviceName))?;
+            .ok_or_else(|| Error::from(ErrorKind::InvalidDeviceName))?;
 
         debug!(
             "path: {:?}, real path: {:?}, device name: {:?}",
             path, real_path, device_name
         );
 
+        drop(path);
         let _self = Self { name: device_name };
         if !(_self.is_removable()? || _self.is_loop_device()) {
             return Err(ErrorKind::DangerousDevice)?;
