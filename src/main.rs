@@ -1,12 +1,3 @@
-extern crate failure;
-extern crate log;
-extern crate nix;
-extern crate simplelog;
-extern crate structopt;
-extern crate tempfile;
-extern crate which;
-use nix::sys::signal;
-
 mod alma;
 mod block;
 mod cryptsetup;
@@ -15,12 +6,14 @@ mod mountstack;
 mod process;
 mod tool;
 
-use alma::ALMA;
-use cryptsetup::EncryptedDevice;
-use error::*;
+use crate::alma::ALMA;
+use crate::cryptsetup::EncryptedDevice;
+use crate::error::*;
+use crate::process::CommandExt;
+use crate::tool::Tool;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
-use process::CommandExt;
+use nix::sys::signal;
 use simplelog::*;
 use std::fs;
 use std::io::Write;
@@ -30,7 +23,6 @@ use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
 use tempfile::tempdir;
-use tool::Tool;
 
 static MKINITCPIO: &'static str = "MODULES=()
 BINARIES=()
@@ -66,11 +58,11 @@ enum Command {
 #[derive(StructOpt)]
 struct CreateCommand {
     /// Path starting with /dev/disk/by-id for the USB drive
-    #[structopt(parse(from_os_str),)]
+    #[structopt(parse(from_os_str))]
     block_device: PathBuf,
 
     /// Additional pacakges to install
-    #[structopt(short = "p", long = "extra-packages", value_name = "package",)]
+    #[structopt(short = "p", long = "extra-packages", value_name = "package")]
     extra_packages: Vec<String>,
 
     /// Enter interactive chroot before unmounting the drive
@@ -85,7 +77,7 @@ struct CreateCommand {
 #[derive(StructOpt)]
 struct ChrootCommand {
     /// Path starting with /dev/disk/by-id for the USB drive
-    #[structopt(parse(from_os_str),)]
+    #[structopt(parse(from_os_str))]
     block_device: PathBuf,
 
     /// Open an encrypted root partition
@@ -138,7 +130,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             "--largest-new=3",
             "--typecode=1:EF02",
             "--typecode=2:EF00",
-        ]).arg(&disk_path)
+        ])
+        .arg(&disk_path)
         .run(ErrorKind::Partitioning)?;
 
     thread::sleep(Duration::from_millis(1000));
@@ -171,7 +164,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             device.path()
         } else {
             &root_partition
-        }).run(ErrorKind::Formatting)?;
+        })
+        .run(ErrorKind::Formatting)?;
 
     let alma = ALMA::new(block_device, encrypted_root);
     let mount_stack = alma.mount(mount_point.path())?;
@@ -188,7 +182,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             "intel-ucode",
             "networkmanager",
             "broadcom-wl",
-        ]).args(&command.extra_packages)
+        ])
+        .args(&command.extra_packages)
         .run(ErrorKind::Pacstrap)?;
 
     let fstab = fix_fstab(
@@ -211,7 +206,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     fs::write(
         mount_point.path().join("etc/systemd/journald.conf"),
         JOURNALD_CONF,
-    ).context(ErrorKind::PostInstallation)?;
+    )
+    .context(ErrorKind::PostInstallation)?;
 
     info!("Generating initramfs");
     fs::write(mount_point.path().join("etc/mkinitcpio.conf"), MKINITCPIO)
@@ -243,7 +239,8 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             &mut grub_file,
             "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID={}:luks_root\"",
             trimmed
-        ).context(ErrorKind::Bootloader)?;
+        )
+        .context(ErrorKind::Bootloader)?;
     }
 
     info!("Installing the Bootloader");
