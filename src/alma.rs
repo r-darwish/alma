@@ -46,7 +46,8 @@ impl<'a> ALMA<'a> {
                 boot_point,
                 Filesystem::Vfat,
                 None,
-            ).context(ErrorKind::Mounting)?;
+            )
+            .context(ErrorKind::Mounting)?;
 
         Ok(mount_stack)
     }
