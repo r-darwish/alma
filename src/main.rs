@@ -83,6 +83,10 @@ struct ChrootCommand {
     /// Open an encrypted root partition
     #[structopt(short = "e", long = "encrypted-root")]
     encrypted_root: bool,
+
+    /// Optional command to run
+    #[structopt()]
+    command: Vec<String>,
 }
 
 fn fix_fstab(fstab: &str) -> String {
@@ -293,6 +297,7 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     arch_chroot
         .execute()
         .arg(mount_point.path())
+        .args(&command.command)
         .run(ErrorKind::Interactive)?;
 
     info!("Unmounting filesystems");
