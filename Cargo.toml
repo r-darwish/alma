@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 which = "2.0.1"
-failure = "0.1.4"
+failure = "0.1.5"
 log = "0.4.6"
 structopt = "0.2.14"
 simplelog = "0.5.3"
