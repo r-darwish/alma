@@ -1,6 +1,6 @@
 [[package]]
 name = "alma"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
