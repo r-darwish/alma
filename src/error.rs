@@ -67,6 +67,9 @@ pub enum ErrorKind {
 
     #[fail(display = "Error closing the encrypted device")]
     LuksClose,
+
+    #[fail(display = "Error setting the locale")]
+    Locale,
 }
 
 impl Fail for Error {

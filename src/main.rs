@@ -213,6 +213,24 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     )
     .context(ErrorKind::PostInstallation)?;
 
+    info!("Setting locale");
+    fs::OpenOptions::new()
+        .append(true)
+        .write(true)
+        .open(mount_point.path().join("etc/locale.gen"))
+        .and_then(|mut locale_gen| locale_gen.write_all(b"en_US.UTF-8 UTF-8\n"))
+        .context(ErrorKind::Locale)?;
+    fs::write(
+        mount_point.path().join("etc/locale.conf"),
+        "LANG=en_US.UTF-8",
+    )
+    .context(ErrorKind::Locale)?;
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .arg("locale-gen")
+        .run(ErrorKind::Locale)?;
+
     info!("Generating initramfs");
     fs::write(mount_point.path().join("etc/mkinitcpio.conf"), MKINITCPIO)
         .context(ErrorKind::Initramfs)?;
