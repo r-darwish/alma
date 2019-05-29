@@ -1,8 +1,10 @@
+mod args;
 mod error;
 mod process;
 mod storage;
 mod tool;
 
+use crate::args::*;
 use crate::error::*;
 use crate::process::CommandExt;
 use crate::storage::*;
@@ -13,7 +15,7 @@ use nix::sys::signal;
 use simplelog::*;
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::exit;
 use std::thread;
 use std::time::Duration;
@@ -33,60 +35,6 @@ static JOURNALD_CONF: &'static str = "
 Storage=volatile
 SystemMaxUse=16M
 ";
-
-#[derive(StructOpt)]
-#[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
-struct App {
-    /// Verbose output
-    #[structopt(short = "v", long = "verbose")]
-    verbose: bool,
-
-    #[structopt(subcommand)]
-    cmd: Command,
-}
-
-#[derive(StructOpt)]
-enum Command {
-    #[structopt(name = "create", about = "Create a new Arch Linux USB")]
-    Create(CreateCommand),
-
-    #[structopt(name = "chroot", about = "Chroot into exiting Live USB")]
-    Chroot(ChrootCommand),
-}
-
-#[derive(StructOpt)]
-struct CreateCommand {
-    /// Path starting with /dev/disk/by-id for the USB drive
-    #[structopt(parse(from_os_str))]
-    block_device: PathBuf,
-
-    /// Additional pacakges to install
-    #[structopt(short = "p", long = "extra-packages", value_name = "package")]
-    extra_packages: Vec<String>,
-
-    /// Enter interactive chroot before unmounting the drive
-    #[structopt(short = "i", long = "interactive")]
-    interactive: bool,
-
-    /// Encrypt the root partition
-    #[structopt(short = "e", long = "encrypted-root")]
-    encrypted_root: bool,
-}
-
-#[derive(StructOpt)]
-struct ChrootCommand {
-    /// Path starting with /dev/disk/by-id for the USB drive
-    #[structopt(parse(from_os_str))]
-    block_device: PathBuf,
-
-    /// Open an encrypted root partition
-    #[structopt(short = "e", long = "encrypted-root")]
-    encrypted_root: bool,
-
-    /// Optional command to run
-    #[structopt()]
-    command: Vec<String>,
-}
 
 fn mount<'a>(
     mount_path: &Path,
