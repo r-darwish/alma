@@ -20,6 +20,9 @@ use std::time::Duration;
 use structopt::StructOpt;
 use tempfile::tempdir;
 
+const BOOT_PARTITION_INDEX: u8 = 1;
+const ROOT_PARTITION_INDEX: u8 = 3;
+
 static MKINITCPIO: &'static str = "MODULES=()
 BINARIES=()
 FILES=()
@@ -163,10 +166,10 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     thread::sleep(Duration::from_millis(1000));
 
     info!("Formatting filesystems");
-    let boot_partition = storage_device.get_partition(1)?;
+    let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;
     let boot_filesystem = Filesystem::format(&boot_partition, FilesystemType::Vfat, &mkfat)?;
 
-    let root_partition_base = storage_device.get_partition(3)?;
+    let root_partition_base = storage_device.get_partition(ROOT_PARTITION_INDEX)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
         info!("Encrypting the root filesystem");
         EncryptedDevice::prepare(&cryptsetup, &root_partition_base)?;
@@ -313,10 +316,10 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let storage_device = storage::StorageDevice::from_path(command.block_device)?;
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
 
-    let boot_partition = storage_device.get_partition(1)?;
+    let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;
     let boot_filesystem = Filesystem::from_partition(&boot_partition, FilesystemType::Vfat);
 
-    let root_partition_base = storage_device.get_partition(3)?;
+    let root_partition_base = storage_device.get_partition(ROOT_PARTITION_INDEX)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
         Some(EncryptedDevice::open(
             cryptsetup,
