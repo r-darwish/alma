@@ -1,15 +1,18 @@
-use super::error::{Error, ErrorKind};
+use super::markers::{BlockDevice, Origin};
+use super::partition::Partition;
+use crate::error::{Error, ErrorKind};
 use failure::ResultExt;
 use log::debug;
 use std::fs::read_to_string;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-pub struct BlockDevice {
+pub struct StorageDevice {
     name: String,
+    path: PathBuf,
 }
 
-impl BlockDevice {
+impl StorageDevice {
     pub fn from_path(path: PathBuf) -> Result<Self, Error> {
         let real_path = path.canonicalize().context(ErrorKind::DeviceQuery)?;
         let device_name = real_path
@@ -24,8 +27,11 @@ impl BlockDevice {
         );
 
         drop(path);
-        let _self = Self { name: device_name };
-        if !(_self.is_removable()? || _self.is_loop_device()) {
+        let _self = Self {
+            name: device_name,
+            path: real_path,
+        };
+        if !(_self.is_removable_device()? || _self.is_loop_device()) {
             return Err(ErrorKind::DangerousDevice)?;
         }
 
@@ -38,7 +44,7 @@ impl BlockDevice {
         path
     }
 
-    fn is_removable(&self) -> Result<bool, Error> {
+    fn is_removable_device(&self) -> Result<bool, Error> {
         let mut path = self.sys_path();
         path.push("removable");
 
@@ -55,13 +61,7 @@ impl BlockDevice {
         path.exists()
     }
 
-    pub fn device_path(&self) -> PathBuf {
-        let mut path = PathBuf::from("/dev");
-        path.push(self.name.clone());
-        path
-    }
-
-    pub fn partition_device_path(&self, index: u8) -> Result<PathBuf, Error> {
+    pub fn get_partition(&self, index: u8) -> Result<Partition, Error> {
         let name = if self.name.chars().rev().next().unwrap().is_digit(10) {
             format!("{}p{}", self.name, index)
         } else {
@@ -74,6 +74,14 @@ impl BlockDevice {
         if !path.exists() {
             return Err(ErrorKind::NoSuchPartition(index).into());
         }
-        Ok(path)
+        Ok(Partition::new::<Self>(path))
     }
 }
+
+impl BlockDevice for StorageDevice {
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Origin for StorageDevice {}

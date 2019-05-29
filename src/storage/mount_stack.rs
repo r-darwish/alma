@@ -1,52 +1,38 @@
-use super::error::{Error, ErrorKind};
+use super::Filesystem;
+use crate::error::{Error, ErrorKind};
 use failure::Fail;
 use log::{debug, warn};
 use nix;
 use nix::mount::{mount, umount, MsFlags};
-use std::borrow::Cow;
-use std::path::Path;
-
-#[derive(Debug, Clone, Copy)]
-pub enum Filesystem {
-    Ext4,
-    Vfat,
-}
-
-impl Filesystem {
-    fn to_type(self) -> &'static str {
-        match self {
-            Filesystem::Ext4 => "ext4",
-            Filesystem::Vfat => "vfat",
-        }
-    }
-}
+use std::marker::PhantomData;
+use std::path::PathBuf;
 
 pub struct MountStack<'a> {
-    targets: Vec<Cow<'a, Path>>,
+    targets: Vec<PathBuf>,
+    filesystems: PhantomData<Filesystem<'a>>,
 }
 
 impl<'a> MountStack<'a> {
     pub fn new() -> Self {
         MountStack {
             targets: Vec::new(),
+            filesystems: PhantomData,
         }
     }
 
     #[must_use]
-    pub fn mount<T: Into<Cow<'a, Path>>>(
+    pub fn mount(
         &mut self,
-        source: &Path,
-        target: T,
-        filesystem: Filesystem,
+        filesystem: &'a Filesystem,
+        target: PathBuf,
         options: Option<&str>,
     ) -> nix::Result<()> {
-        let target = target.into();
-
-        debug!("Mounting {:?} ({:?}) to {:?}", source, filesystem, target);
+        let source = filesystem.block().path();
+        debug!("Mounting {:?} to {:?}", filesystem, target);
         mount(
             Some(source),
-            target.as_ref(),
-            Some(filesystem.to_type()),
+            &target,
+            Some(filesystem.fs_type().to_mount_type()),
             MsFlags::MS_NOATIME,
             options,
         )?;
@@ -59,7 +45,7 @@ impl<'a> MountStack<'a> {
 
         while let Some(target) = self.targets.pop() {
             debug!("Unmounting {}", target.display());
-            if let Err(e) = umount(target.as_ref()) {
+            if let Err(e) = umount(&target) {
                 warn!("Unable to umount {}: {}", target.display(), e);
                 result = Err(Error::from(e.context(ErrorKind::UmountFailure)));
             };

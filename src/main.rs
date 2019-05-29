@@ -1,15 +1,11 @@
-mod alma;
-mod block;
-mod cryptsetup;
 mod error;
-mod mountstack;
 mod process;
+mod storage;
 mod tool;
 
-use crate::alma::ALMA;
-use crate::cryptsetup::EncryptedDevice;
 use crate::error::*;
 use crate::process::CommandExt;
+use crate::storage::*;
 use crate::tool::Tool;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
@@ -17,7 +13,7 @@ use nix::sys::signal;
 use simplelog::*;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
 use std::time::Duration;
@@ -89,6 +85,34 @@ struct ChrootCommand {
     command: Vec<String>,
 }
 
+fn mount<'a>(
+    mount_path: &Path,
+    boot_filesystem: &'a Filesystem,
+    root_filesystem: &'a Filesystem,
+) -> Result<MountStack<'a>, Error> {
+    let mut mount_stack = MountStack::new();
+    debug!(
+        "Root partition: {}",
+        root_filesystem.block().path().display()
+    );
+
+    info!("Mounting filesystems to {}", mount_path.display());
+    mount_stack
+        .mount(&root_filesystem, mount_path.into(), None)
+        .context(ErrorKind::Mounting)?;
+
+    let boot_point = mount_path.join("boot");
+    if !boot_point.exists() {
+        fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
+    }
+
+    mount_stack
+        .mount(&boot_filesystem, boot_point, None)
+        .context(ErrorKind::Mounting)?;
+
+    Ok(mount_stack)
+}
+
 fn fix_fstab(fstab: &str) -> String {
     fstab
         .lines()
@@ -115,11 +139,9 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         None
     };
 
-    let block_device = block::BlockDevice::from_path(command.block_device)?;
-
+    let storage_device = storage::StorageDevice::from_path(command.block_device)?;
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
-
-    let disk_path = block_device.device_path();
+    let disk_path = storage_device.path();
 
     info!("Partitioning the block device");
     debug!("{:?}", disk_path);
@@ -141,38 +163,31 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     thread::sleep(Duration::from_millis(1000));
 
     info!("Formatting filesystems");
-    let boot_partition = block_device.partition_device_path(1)?;
-    mkfat
-        .execute()
-        .arg("-F32")
-        .arg(&boot_partition)
-        .run(ErrorKind::Formatting)?;
+    let boot_partition = storage_device.get_partition(1)?;
+    let boot_filesystem = Filesystem::format(&boot_partition, FilesystemType::Vfat, &mkfat)?;
 
-    let root_partition = block_device.partition_device_path(3)?;
+    let root_partition_base = storage_device.get_partition(3)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
         info!("Encrypting the root filesystem");
-        EncryptedDevice::prepare(&cryptsetup, &root_partition)?;
+        EncryptedDevice::prepare(&cryptsetup, &root_partition_base)?;
         Some(EncryptedDevice::open(
             cryptsetup,
-            &root_partition,
-            "alma_root",
+            &root_partition_base,
+            "alma_root".into(),
         )?)
     } else {
         None
     };
 
-    mkext4
-        .execute()
-        .arg("-F")
-        .arg(if let Some(device) = &encrypted_root {
-            device.path()
-        } else {
-            &root_partition
-        })
-        .run(ErrorKind::Formatting)?;
+    let root_partition = if let Some(e) = encrypted_root.as_ref() {
+        e as &BlockDevice
+    } else {
+        &root_partition_base as &BlockDevice
+    };
 
-    let alma = ALMA::new(block_device, encrypted_root);
-    let mount_stack = alma.mount(mount_point.path())?;
+    let root_filesystem = Filesystem::format(root_partition, FilesystemType::Ext4, &mkext4)?;
+
+    let mount_stack = mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
 
     info!("Bootstrapping system");
     pacstrap
@@ -246,7 +261,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         let uuid = blkid
             .unwrap()
             .execute()
-            .arg(root_partition)
+            .arg(root_partition.path())
             .args(&["-o", "value", "-s", "UUID"])
             .run_text_output(ErrorKind::Partitioning)?;
         let trimmed = uuid.trim();
@@ -295,22 +310,31 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
         None
     };
 
-    let block_device = block::BlockDevice::from_path(command.block_device)?;
-
+    let storage_device = storage::StorageDevice::from_path(command.block_device)?;
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
-    let root_partition = block_device.partition_device_path(3)?;
+
+    let boot_partition = storage_device.get_partition(1)?;
+    let boot_filesystem = Filesystem::from_partition(&boot_partition, FilesystemType::Vfat);
+
+    let root_partition_base = storage_device.get_partition(3)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
         Some(EncryptedDevice::open(
             cryptsetup,
-            &root_partition,
-            "alma_root",
+            &root_partition_base,
+            "alma_root".into(),
         )?)
     } else {
         None
     };
 
-    let alma = ALMA::new(block_device, encrypted_root);
-    let mount_stack = alma.mount(mount_point.path())?;
+    let root_partition = if let Some(e) = encrypted_root.as_ref() {
+        e as &BlockDevice
+    } else {
+        &root_partition_base as &BlockDevice
+    };
+    let root_filesystem = Filesystem::from_partition(root_partition, FilesystemType::Ext4);
+
+    let mount_stack = mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
 
     arch_chroot
         .execute()
