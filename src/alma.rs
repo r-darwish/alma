@@ -42,7 +42,7 @@ impl<'a> ALMA<'a> {
 
         mount_stack
             .mount(
-                &self.block.partition_device_path(2)?,
+                &self.block.partition_device_path(1)?,
                 boot_point,
                 Filesystem::Vfat,
                 None,

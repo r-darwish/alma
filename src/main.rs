@@ -129,11 +129,11 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         .args(&[
             "-Z",
             "-o",
-            "--new=1::+10M",
-            "--new=2::+150M",
+            "--new=1::+100M",
+            "--new=2::+1M",
             "--largest-new=3",
-            "--typecode=1:EF02",
-            "--typecode=2:EF00",
+            "--typecode=1:EF00",
+            "--typecode=2:EF02",
         ])
         .arg(&disk_path)
         .run(ErrorKind::Partitioning)?;
@@ -141,7 +141,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     thread::sleep(Duration::from_millis(1000));
 
     info!("Formatting filesystems");
-    let boot_partition = block_device.partition_device_path(2)?;
+    let boot_partition = block_device.partition_device_path(1)?;
     mkfat
         .execute()
         .arg("-F32")
