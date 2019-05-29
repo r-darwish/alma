@@ -206,13 +206,13 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         .args(&["mkinitcpio", "-p", "linux"])
         .run(ErrorKind::Initramfs)?;
 
-    if cryptsetup.is_some() {
+    if encrypted_root.is_some() {
         debug!("Setting up GRUB for an encrypted root partition");
 
         let uuid = blkid
             .unwrap()
             .execute()
-            .arg(root_partition.path())
+            .arg(root_partition_base.path())
             .args(&["-o", "value", "-s", "UUID"])
             .run_text_output(ErrorKind::Partitioning)?;
         let trimmed = uuid.trim();
