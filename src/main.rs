@@ -15,6 +15,7 @@ use nix::sys::signal;
 use simplelog::*;
 use std::fs;
 use std::io::Write;
+use std::os::unix::process::CommandExt as UnixCommandExt;
 use std::path::Path;
 use std::process::exit;
 use std::thread;
@@ -299,6 +300,37 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     Ok(())
 }
 
+fn qemu(command: QemuCommand) -> Result<(), Error> {
+    let qemu = Tool::find("qemu-system-x86_64")?;
+
+    let err = qemu
+        .execute()
+        .args(&[
+            "-enable-kvm",
+            "-cpu",
+            "host",
+            "-m",
+            "4G",
+            "-netdev",
+            "user,id=user.0",
+            "-device",
+            "virtio-net-pci,netdev=user.0",
+            "-device",
+            "qemu-xhci,id=xhci",
+            "-device",
+            "usb-tablet,bus=xhci.0",
+            "-drive",
+        ])
+        .arg(format!(
+            "file={},if=virtio,format=raw",
+            command.block_device.display()
+        ))
+        .args(command.args)
+        .exec();
+
+    Err(err).context(ErrorKind::Qemu)?
+}
+
 extern "C" fn handle_sigint(_: i32) {
     warn!("Interrupted");
 }
@@ -327,6 +359,7 @@ fn main() {
     let result = match app.cmd {
         Command::Create(command) => create(command),
         Command::Chroot(command) => chroot(command),
+        Command::Qemu(command) => qemu(command),
     };
 
     match result {

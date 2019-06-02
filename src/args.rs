@@ -19,6 +19,9 @@ pub enum Command {
 
     #[structopt(name = "chroot", about = "Chroot into exiting Live USB")]
     Chroot(ChrootCommand),
+
+    #[structopt(name = "qemu", about = "Boot the USB with Qemu")]
+    Qemu(QemuCommand),
 }
 
 #[derive(StructOpt)]
@@ -53,4 +56,15 @@ pub struct ChrootCommand {
     /// Optional command to run
     #[structopt()]
     pub command: Vec<String>,
+}
+
+#[derive(StructOpt)]
+pub struct QemuCommand {
+    /// Path starting with /dev/disk/by-id for the USB drive
+    #[structopt(parse(from_os_str))]
+    pub block_device: PathBuf,
+
+    /// Arguments to pass to qemu
+    #[structopt()]
+    pub args: Vec<String>,
 }

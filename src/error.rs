@@ -70,6 +70,9 @@ pub enum ErrorKind {
 
     #[fail(display = "Error setting the locale")]
     Locale,
+
+    #[fail(display = "Failed launching Qemu")]
+    Qemu,
 }
 
 impl Fail for Error {
