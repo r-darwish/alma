@@ -1,5 +1,6 @@
 mod args;
 mod error;
+mod presets;
 mod process;
 mod storage;
 mod tool;
@@ -13,9 +14,10 @@ use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
 use nix::sys::signal;
 use simplelog::*;
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
-use std::os::unix::process::CommandExt as UnixCommandExt;
+use std::os::unix::{fs::PermissionsExt, process::CommandExt as UnixCommandExt};
 use std::path::Path;
 use std::process::exit;
 use std::thread;
@@ -74,6 +76,8 @@ fn fix_fstab(fstab: &str) -> String {
 }
 
 fn create(command: CreateCommand) -> Result<(), Error> {
+    let presets = presets::Presets::load(&command.presets)?;
+
     let sgdisk = Tool::find("sgdisk")?;
     let pacstrap = Tool::find("pacstrap")?;
     let arch_chroot = Tool::find("arch-chroot")?;
@@ -141,19 +145,26 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
     let mount_stack = mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
 
+    let mut packages: HashSet<String> = [
+        "base",
+        "grub",
+        "efibootmgr",
+        "intel-ucode",
+        "networkmanager",
+        "broadcom-wl",
+    ]
+    .iter()
+    .map(|s| String::from(*s))
+    .collect();
+
+    packages.extend(presets.packages);
+
     info!("Bootstrapping system");
     pacstrap
         .execute()
         .arg("-c")
         .arg(mount_point.path())
-        .args(&[
-            "base",
-            "grub",
-            "efibootmgr",
-            "intel-ucode",
-            "networkmanager",
-            "broadcom-wl",
-        ])
+        .args(packages)
         .args(&command.extra_packages)
         .run(ErrorKind::Pacstrap)?;
 
@@ -166,6 +177,33 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     );
     debug!("fstab:\n{}", fstab);
     fs::write(mount_point.path().join("etc/fstab"), fstab).context(ErrorKind::Fstab)?;
+
+    if !presets.scripts.is_empty() {
+        info!("Running custom scripts");
+    }
+
+    for script in presets.scripts {
+        let mut script_file =
+            tempfile::NamedTempFile::new_in(mount_point.path()).context(ErrorKind::PresetScript)?;
+        script_file
+            .write_all(script.as_bytes())
+            .and_then(|_| script_file.as_file_mut().metadata())
+            .and_then(|metadata| {
+                let mut permissions = metadata.permissions();
+                permissions.set_mode(0o755);
+                fs::set_permissions(script_file.path(), permissions)
+            })
+            .context(ErrorKind::PresetScript)?;
+
+        let script_path = script_file.into_temp_path();
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .arg(Path::new("/").join(script_path.file_name().unwrap()))
+            .run(ErrorKind::PostInstallation)?;
+    }
+
+    info!("Performing post installation tasks");
 
     arch_chroot
         .execute()

@@ -6,7 +6,7 @@ pub struct Error {
     inner: Context<ErrorKind>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
+#[derive(Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
     #[fail(display = "Error quering information about the block device")]
     DeviceQuery,
@@ -73,6 +73,12 @@ pub enum ErrorKind {
 
     #[fail(display = "Failed launching Qemu")]
     Qemu,
+
+    #[fail(display = "Error loading preset \"{}\"", _0)]
+    Preset(String),
+
+    #[fail(display = "Error executing preset script")]
+    PresetScript,
 }
 
 impl Fail for Error {

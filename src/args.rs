@@ -41,6 +41,10 @@ pub struct CreateCommand {
     /// Encrypt the root partition
     #[structopt(short = "e", long = "encrypted-root")]
     pub encrypted_root: bool,
+
+    /// Path to preset files
+    #[structopt(long = "presets")]
+    pub presets: Vec<PathBuf>,
 }
 
 #[derive(StructOpt)]
