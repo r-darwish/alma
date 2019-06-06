@@ -1,0 +1,13 @@
+script = """
+set -exu
+
+cat << 'EOF' >> /etc/pacman.conf
+[archzfs]
+Server = https://archzfs.com/$repo/$arch
+EOF
+
+pacman-key -r F75D9D76
+pacman-key --lsign-key F75D9D76
+
+pacman -Sy archzfs-linux
+"""

@@ -1,0 +1,9 @@
+packages = ["sudo"]
+script = """
+set -eux
+
+useradd -m ${ALMA_USER}
+passwd ${ALMA_USER}
+usermod -G wheel -a ${ALMA_USER}
+"""
+environment_variables = ["ALMA_USER"]

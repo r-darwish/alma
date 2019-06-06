@@ -1,0 +1,6 @@
+packages = ["plasma-desktop", "dolphin", "gwenview", "konsole", "ttf-dejavu", "sddm"]
+script = """
+set -exu
+
+systemctl enable sddm
+"""
