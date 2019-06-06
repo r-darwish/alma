@@ -77,6 +77,9 @@ pub enum ErrorKind {
     #[fail(display = "Error loading preset \"{}\"", _0)]
     Preset(String),
 
+    #[fail(display = "Missing environment variables \"{:?}\"", _0)]
+    MissingEnvironmentVariables(Vec<String>),
+
     #[fail(display = "Error executing preset script")]
     PresetScript,
 }
