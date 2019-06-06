@@ -33,7 +33,7 @@ pub enum Command {
 pub struct CreateCommand {
     /// Either a path to a removable block device or a nonexiting file if --image is specified
     #[structopt(parse(from_os_str))]
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
 
     /// Additional pacakges to install
     #[structopt(short = "p", long = "extra-packages", value_name = "package")]
@@ -55,7 +55,8 @@ pub struct CreateCommand {
     #[structopt(
         long = "image",
         parse(try_from_str = "parse_bytes"),
-        value_name = "size"
+        value_name = "size",
+        requires = "path"
     )]
     pub image: Option<Byte>,
 }

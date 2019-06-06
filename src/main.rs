@@ -13,14 +13,15 @@ use crate::tool::Tool;
 use byte_unit::Byte;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
-use nix::sys::signal;
 use simplelog::*;
 use std::collections::HashSet;
 use std::fs;
-use std::io::Write;
+use std::io::{stdin, stdout, BufRead, Write};
 use std::os::unix::{fs::PermissionsExt, process::CommandExt as UnixCommandExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -91,7 +92,45 @@ fn create_image(path: &Path, size: Byte) -> Result<LoopDevice, Error> {
     LoopDevice::create(path)
 }
 
-fn create(command: CreateCommand) -> Result<(), Error> {
+fn select_block_device(running: Arc<AtomicBool>) -> Result<PathBuf, Error> {
+    let devices = get_removable_devices()?;
+
+    if devices.is_empty() {
+        Err(ErrorKind::NoRemovableDevices)?
+    }
+
+    devices
+        .iter()
+        .enumerate()
+        .for_each(|(i, d)| println!("{}) {}", i + 1, d));
+
+    print!("\nSelect a removable device by Typing its number: ");
+    stdout().lock().flush().ok();
+
+    let mut buffer = String::new();
+    loop {
+        stdin().lock().read_line(&mut buffer).unwrap();
+
+        if buffer.is_empty() || !running.load(Ordering::SeqCst) {
+            println!();
+            Err(ErrorKind::DeviceSelection)?;
+        }
+
+        let choice = buffer
+            .trim()
+            .parse::<usize>()
+            .ok()
+            .filter(|n| 0 < *n && *n <= devices.len());
+
+        if let Some(choice) = choice {
+            return Ok(PathBuf::from("/dev").join(&devices[choice - 1].name));
+        } else {
+            error!("Bad choice");
+        }
+    }
+}
+
+fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error> {
     let presets = presets::Presets::load(&command.presets)?;
 
     let sgdisk = Tool::find("sgdisk")?;
@@ -111,8 +150,14 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         None
     };
 
+    let storage_device_path = if let Some(path) = command.path {
+        path
+    } else {
+        select_block_device(running)?
+    };
+
     let image_loop = if let Some(size) = command.image {
-        Some(create_image(&command.path, size)?)
+        Some(create_image(&storage_device_path, size)?)
     } else {
         None
     };
@@ -124,8 +169,9 @@ fn create(command: CreateCommand) -> Result<(), Error> {
                 info!("Using loop device at {}", loop_dev.path().display());
                 loop_dev.path()
             })
-            .unwrap_or(&command.path),
+            .unwrap_or(&storage_device_path),
     )?;
+
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
     let disk_path = storage_device.path();
 
@@ -403,10 +449,6 @@ fn qemu(command: QemuCommand) -> Result<(), Error> {
     Err(err).context(ErrorKind::Qemu)?
 }
 
-extern "C" fn handle_sigint(_: i32) {
-    warn!("Interrupted");
-}
-
 fn main() {
     let app = App::from_args();
 
@@ -417,19 +459,17 @@ fn main() {
     };
     CombinedLogger::init(vec![TermLogger::new(log_level, Config::default()).unwrap()]).unwrap();
 
-    let sig_action = signal::SigAction::new(
-        signal::SigHandler::Handler(handle_sigint),
-        signal::SaFlags::empty(),
-        signal::SigSet::empty(),
-    );
-    unsafe {
-        signal::sigaction(signal::SIGINT, &sig_action).unwrap();
-        signal::sigaction(signal::SIGTERM, &sig_action).unwrap();
-        signal::sigaction(signal::SIGQUIT, &sig_action).unwrap();
-    }
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+
+    ctrlc::set_handler(move || {
+        warn!("Interrupted");
+        r.store(false, Ordering::SeqCst);
+    })
+    .expect("Error setting Ctrl-C handler");
 
     let result = match app.cmd {
-        Command::Create(command) => create(command),
+        Command::Create(command) => create(command, running),
         Command::Chroot(command) => chroot(command),
         Command::Qemu(command) => qemu(command),
     };
