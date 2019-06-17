@@ -1,5 +1,10 @@
+use byte_unit::Byte;
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+fn parse_bytes(src: &str) -> Result<Byte, &'static str> {
+    Byte::from_string(src).map_err(|_| "Invalid image size")
+}
 
 #[derive(StructOpt)]
 #[structopt(name = "alma", about = "Arch Linux Mobile Appliance")]
@@ -26,9 +31,9 @@ pub enum Command {
 
 #[derive(StructOpt)]
 pub struct CreateCommand {
-    /// Path starting with /dev/disk/by-id for the USB drive
+    /// Either a path to a removable block device or a nonexiting file if --image is specified
     #[structopt(parse(from_os_str))]
-    pub block_device: PathBuf,
+    pub path: PathBuf,
 
     /// Additional pacakges to install
     #[structopt(short = "p", long = "extra-packages", value_name = "package")]
@@ -43,8 +48,16 @@ pub struct CreateCommand {
     pub encrypted_root: bool,
 
     /// Path to preset files
-    #[structopt(long = "presets")]
+    #[structopt(long = "presets", value_name = "preset")]
     pub presets: Vec<PathBuf>,
+
+    /// Create an image with a certain size in the given path instead of using an actual block device
+    #[structopt(
+        long = "image",
+        parse(try_from_str = "parse_bytes"),
+        value_name = "size"
+    )]
+    pub image: Option<Byte>,
 }
 
 #[derive(StructOpt)]

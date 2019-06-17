@@ -10,6 +10,7 @@ use crate::error::*;
 use crate::process::CommandExt;
 use crate::storage::*;
 use crate::tool::Tool;
+use byte_unit::Byte;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, warn};
 use nix::sys::signal;
@@ -75,6 +76,21 @@ fn fix_fstab(fstab: &str) -> String {
         .join("\n")
 }
 
+fn create_image(path: &Path, size: Byte) -> Result<LoopDevice, Error> {
+    {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .context(ErrorKind::Image)?;
+
+        file.set_len(size.get_bytes() as u64)
+            .context(ErrorKind::Image)?;
+    }
+
+    LoopDevice::create(path)
+}
+
 fn create(command: CreateCommand) -> Result<(), Error> {
     let presets = presets::Presets::load(&command.presets)?;
 
@@ -95,7 +111,21 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         None
     };
 
-    let storage_device = storage::StorageDevice::from_path(command.block_device)?;
+    let image_loop = if let Some(size) = command.image {
+        Some(create_image(&command.path, size)?)
+    } else {
+        None
+    };
+
+    let storage_device = storage::StorageDevice::from_path(
+        image_loop
+            .as_ref()
+            .map(|loop_dev| {
+                info!("Using loop device at {}", loop_dev.path().display());
+                loop_dev.path()
+            })
+            .unwrap_or(&command.path),
+    )?;
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
     let disk_path = storage_device.path();
 
@@ -300,7 +330,7 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
         None
     };
 
-    let storage_device = storage::StorageDevice::from_path(command.block_device)?;
+    let storage_device = storage::StorageDevice::from_path(&command.block_device)?;
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
 
     let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;

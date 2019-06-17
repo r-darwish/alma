@@ -82,6 +82,12 @@ pub enum ErrorKind {
 
     #[fail(display = "Error executing preset script")]
     PresetScript,
+
+    #[fail(display = "Error creating the image")]
+    Image,
+
+    #[fail(display = "Error setting up a loop device: {}", _0)]
+    Losetup(String),
 }
 
 impl Fail for Error {

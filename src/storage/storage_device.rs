@@ -4,16 +4,18 @@ use crate::error::{Error, ErrorKind};
 use failure::ResultExt;
 use log::debug;
 use std::fs::read_to_string;
+use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-pub struct StorageDevice {
+pub struct StorageDevice<'a> {
     name: String,
     path: PathBuf,
+    origin: PhantomData<&'a Origin>,
 }
 
-impl StorageDevice {
-    pub fn from_path(path: PathBuf) -> Result<Self, Error> {
+impl<'a> StorageDevice<'a> {
+    pub fn from_path(path: &'a Path) -> Result<Self, Error> {
         let real_path = path.canonicalize().context(ErrorKind::DeviceQuery)?;
         let device_name = real_path
             .file_name()
@@ -30,6 +32,7 @@ impl StorageDevice {
         let _self = Self {
             name: device_name,
             path: real_path,
+            origin: PhantomData,
         };
         if !(_self.is_removable_device()? || _self.is_loop_device()) {
             return Err(ErrorKind::DangerousDevice)?;
@@ -78,10 +81,10 @@ impl StorageDevice {
     }
 }
 
-impl BlockDevice for StorageDevice {
+impl<'a> BlockDevice for StorageDevice<'a> {
     fn path(&self) -> &Path {
         &self.path
     }
 }
 
-impl Origin for StorageDevice {}
+impl<'a> Origin for StorageDevice<'a> {}
