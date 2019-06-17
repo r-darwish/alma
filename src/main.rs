@@ -330,7 +330,14 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
         None
     };
 
-    let storage_device = storage::StorageDevice::from_path(&command.block_device)?;
+    let mut loop_device: Option<LoopDevice>;
+    let storage_device = match storage::StorageDevice::from_path(&command.block_device) {
+        Ok(b) => b,
+        Err(_) => {
+            loop_device = Some(LoopDevice::create(&command.block_device)?);
+            storage::StorageDevice::from_path(loop_device.as_ref().unwrap().path())?
+        }
+    };
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
 
     let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;

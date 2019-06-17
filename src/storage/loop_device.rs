@@ -26,10 +26,10 @@ impl LoopDevice {
             ))?
         }
 
-        Ok(LoopDevice {
-            path: PathBuf::from(String::from_utf8(output.stdout).unwrap().trim()),
-            losetup,
-        })
+        let path = PathBuf::from(String::from_utf8(output.stdout).unwrap().trim());
+        info!("Mounted {} to {}", file.display(), path.display());
+
+        Ok(LoopDevice { path, losetup })
     }
 
     pub fn path(&self) -> &Path {
