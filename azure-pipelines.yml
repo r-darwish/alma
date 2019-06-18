@@ -1,0 +1,6 @@
+pool:
+  vmImage: 'ubuntu-18.04'
+container: 'rust:latest'
+steps:
+  - script: cargo check --all
+    displayName: Run check
