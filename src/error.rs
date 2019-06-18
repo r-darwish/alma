@@ -68,6 +68,9 @@ pub enum ErrorKind {
     #[fail(display = "Error closing the encrypted device")]
     LuksClose,
 
+    #[fail(display = "Error detecting whether the root partition is an encrypted device")]
+    LuksDetection,
+
     #[fail(display = "Error setting the locale")]
     Locale,
 

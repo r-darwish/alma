@@ -66,10 +66,6 @@ pub struct ChrootCommand {
     #[structopt(parse(from_os_str))]
     pub block_device: PathBuf,
 
-    /// Open an encrypted root partition
-    #[structopt(short = "e", long = "encrypted-root")]
-    pub encrypted_root: bool,
-
     /// Optional command to run
     #[structopt()]
     pub command: Vec<String>,

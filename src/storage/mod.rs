@@ -6,7 +6,7 @@ mod mount_stack;
 mod partition;
 mod storage_device;
 
-pub use crypt::EncryptedDevice;
+pub use crypt::{is_encrypted_device, EncryptedDevice};
 pub use filesystem::{Filesystem, FilesystemType};
 pub use loop_device::LoopDevice;
 pub use markers::BlockDevice;

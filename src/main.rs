@@ -324,11 +324,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
 fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
-    let cryptsetup = if command.encrypted_root {
-        Some(Tool::find("cryptsetup")?)
-    } else {
-        None
-    };
+    let mut cryptsetup;
 
     let mut loop_device: Option<LoopDevice>;
     let storage_device = match storage::StorageDevice::from_path(&command.block_device) {
@@ -344,9 +340,10 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let boot_filesystem = Filesystem::from_partition(&boot_partition, FilesystemType::Vfat);
 
     let root_partition_base = storage_device.get_partition(ROOT_PARTITION_INDEX)?;
-    let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
+    let encrypted_root = if is_encrypted_device(&root_partition_base)? {
+        cryptsetup = Some(Tool::find("cryptsetup")?);
         Some(EncryptedDevice::open(
-            cryptsetup,
+            cryptsetup.as_ref().unwrap(),
             &root_partition_base,
             "alma_root".into(),
         )?)
