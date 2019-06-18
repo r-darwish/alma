@@ -443,7 +443,7 @@ fn main() {
         }
         Err(error) => {
             error!("{}", error);
-            if let Some(cause) = error.cause() {
+            for cause in (&error as &Fail).iter_causes() {
                 error!("Caused by: {}", cause);
             }
             exit(1);
