@@ -1,5 +1,6 @@
 mod args;
 mod error;
+mod initcpio;
 mod presets;
 mod process;
 mod storage;
@@ -29,11 +30,6 @@ use tempfile::tempdir;
 
 const BOOT_PARTITION_INDEX: u8 = 1;
 const ROOT_PARTITION_INDEX: u8 = 3;
-
-static MKINITCPIO: &'static str = "MODULES=()
-BINARIES=()
-FILES=()
-HOOKS=(base udev keyboard consolefont block encrypt filesystems keyboard fsck)";
 
 static JOURNALD_CONF: &'static str = "
 [Journal]
@@ -313,8 +309,11 @@ fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error>
         .run(ErrorKind::Locale)?;
 
     info!("Generating initramfs");
-    fs::write(mount_point.path().join("etc/mkinitcpio.conf"), MKINITCPIO)
-        .context(ErrorKind::Initramfs)?;
+    fs::write(
+        mount_point.path().join("etc/mkinitcpio.conf"),
+        initcpio::Initcpio::new(encrypted_root.is_some()).to_config(),
+    )
+    .context(ErrorKind::Initramfs)?;
     arch_chroot
         .execute()
         .arg(mount_point.path())
