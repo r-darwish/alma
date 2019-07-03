@@ -13,8 +13,8 @@ use crate::storage::*;
 use crate::tool::Tool;
 use byte_unit::Byte;
 use failure::{Fail, ResultExt};
-use log::{debug, error, info, warn};
-use simplelog::*;
+use log::{debug, error, info, warn, LevelFilter};
+use pretty_env_logger;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{stdin, stdout, BufRead, Write};
@@ -451,12 +451,14 @@ fn qemu(command: QemuCommand) -> Result<(), Error> {
 fn main() {
     let app = App::from_args();
 
+    let mut builder = pretty_env_logger::formatted_timed_builder();
     let log_level = if app.verbose {
         LevelFilter::Debug
     } else {
         LevelFilter::Info
     };
-    CombinedLogger::init(vec![TermLogger::new(log_level, Config::default()).unwrap()]).unwrap();
+    builder.filter_level(log_level);
+    builder.init();
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
