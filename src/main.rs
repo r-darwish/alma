@@ -13,14 +13,14 @@ use crate::storage::*;
 use crate::tool::Tool;
 use byte_unit::Byte;
 use failure::{Fail, ResultExt};
-use log::{debug, error, info, warn, LevelFilter};
+use log::{debug, error, info, log_enabled, warn, Level, LevelFilter};
 use pretty_env_logger;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{stdin, stdout, BufRead, Write};
 use std::os::unix::{fs::PermissionsExt, process::CommandExt as UnixCommandExt};
 use std::path::{Path, PathBuf};
-use std::process::exit;
+use std::process::{exit, Command as ProcessCommand};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -218,6 +218,18 @@ fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error>
 
     let mount_stack = mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
 
+    if log_enabled!(Level::Debug) {
+        debug!("lsblk:");
+        ProcessCommand::new("lsblk")
+            .arg("--fs")
+            .spawn()
+            .and_then(|mut p| p.wait())
+            .map_err(|e| {
+                error!("Error running lsblk: {}", e);
+            })
+            .ok();
+    }
+
     let mut packages: HashSet<String> = [
         "base",
         "grub",
@@ -353,6 +365,12 @@ fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error>
         .args(&["bash", "-c"])
         .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk_path.display()))
         .run(ErrorKind::Bootloader)?;
+
+    debug!(
+        "GRUB configuration: {}",
+        fs::read_to_string(mount_point.path().join("boot/grub/grub.cfg"))
+            .unwrap_or_else(|e| e.to_string())
+    );
 
     if command.interactive {
         info!("Dropping you to chroot. Do as you wish to customize the installation");
