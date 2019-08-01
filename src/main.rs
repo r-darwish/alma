@@ -126,6 +126,7 @@ fn select_block_device(running: Arc<AtomicBool>) -> Result<PathBuf, Error> {
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error> {
     let presets = presets::Presets::load(&command.presets)?;
 

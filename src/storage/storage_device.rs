@@ -16,22 +16,19 @@ pub struct StorageDevice<'a> {
 
 impl<'a> StorageDevice<'a> {
     pub fn from_path(path: &'a Path) -> Result<Self, Error> {
-        let real_path = path.canonicalize().context(ErrorKind::DeviceQuery)?;
-        let device_name = real_path
+        debug!("path: {:?}", path);
+        let path = path.canonicalize().context(ErrorKind::DeviceQuery)?;
+        let device_name = path
             .file_name()
             .and_then(|s| s.to_str())
             .map(String::from)
             .ok_or_else(|| Error::from(ErrorKind::InvalidDeviceName))?;
 
-        debug!(
-            "path: {:?}, real path: {:?}, device name: {:?}",
-            path, real_path, device_name
-        );
+        debug!("real path: {:?}, device name: {:?}", path, device_name);
 
-        drop(path);
         let _self = Self {
             name: device_name,
-            path: real_path,
+            path,
             origin: PhantomData,
         };
         if !(_self.is_removable_device()? || _self.is_loop_device()) {
