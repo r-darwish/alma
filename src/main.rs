@@ -73,13 +73,17 @@ fn fix_fstab(fstab: &str) -> String {
         .join("\n")
 }
 
-fn create_image(path: &Path, size: Byte) -> Result<LoopDevice, Error> {
+fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, Error> {
     {
-        let file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .context(ErrorKind::Image)?;
+        let mut options = fs::OpenOptions::new();
+
+        options.write(true);
+        if overwrite {
+            options.create(true);
+        } else {
+            options.create_new(true);
+        }
+        let file = options.open(path).context(ErrorKind::Image)?;
 
         file.set_len(size.get_bytes() as u64)
             .context(ErrorKind::Image)?;
@@ -154,7 +158,7 @@ fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error>
     };
 
     let image_loop = if let Some(size) = command.image {
-        Some(create_image(&storage_device_path, size)?)
+        Some(create_image(&storage_device_path, size, command.overwrite)?)
     } else {
         None
     };

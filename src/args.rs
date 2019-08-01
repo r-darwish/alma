@@ -59,6 +59,10 @@ pub struct CreateCommand {
         requires = "path"
     )]
     pub image: Option<Byte>,
+
+    /// Overwrite existing image files. Use with caution
+    #[structopt(long = "overwrite")]
+    pub overwrite: bool,
 }
 
 #[derive(StructOpt)]
