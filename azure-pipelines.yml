@@ -5,8 +5,10 @@ stages:
         displayName: Sanity Check
         pool:
           vmImage: 'ubuntu-16.04'
-          container: 'rust:latest'
+        container: 'rust:latest'
         steps:
+          - script: rustup component add clippy rustfmt
+            displayName: Install clippy and rustfmt
           - script: cargo fmt -- --check
             displayName: Check Formatting
           - script: cargo check --all
