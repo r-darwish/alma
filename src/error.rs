@@ -97,9 +97,6 @@ pub enum ErrorKind {
 
     #[fail(display = "There are no removable devices")]
     NoRemovableDevices,
-
-    #[fail(display = "Error selecing device")]
-    DeviceSelection,
 }
 
 impl Fail for Error {

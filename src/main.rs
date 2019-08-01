@@ -12,17 +12,16 @@ use crate::process::CommandExt;
 use crate::storage::*;
 use crate::tool::Tool;
 use byte_unit::Byte;
+use dialoguer::{theme::ColorfulTheme, Select};
 use failure::{Fail, ResultExt};
-use log::{debug, error, info, log_enabled, warn, Level, LevelFilter};
+use log::{debug, error, info, log_enabled, Level, LevelFilter};
 use pretty_env_logger;
 use std::collections::HashSet;
 use std::fs;
-use std::io::{stdin, stdout, BufRead, Write};
+use std::io::Write;
 use std::os::unix::{fs::PermissionsExt, process::CommandExt as UnixCommandExt};
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command as ProcessCommand};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -92,46 +91,25 @@ fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, 
     LoopDevice::create(path)
 }
 
-fn select_block_device(running: Arc<AtomicBool>) -> Result<PathBuf, Error> {
+fn select_block_device() -> Result<PathBuf, Error> {
     let devices = get_removable_devices()?;
 
     if devices.is_empty() {
         Err(ErrorKind::NoRemovableDevices)?
     }
 
-    devices
-        .iter()
-        .enumerate()
-        .for_each(|(i, d)| println!("{}) {}", i + 1, d));
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select a removable device")
+        .default(0)
+        .items(&devices)
+        .interact()
+        .unwrap();
 
-    print!("\nSelect a removable device by Typing its number: ");
-    stdout().lock().flush().ok();
-
-    let mut buffer = String::new();
-    loop {
-        stdin().lock().read_line(&mut buffer).unwrap();
-
-        if buffer.is_empty() || !running.load(Ordering::SeqCst) {
-            println!();
-            Err(ErrorKind::DeviceSelection)?;
-        }
-
-        let choice = buffer
-            .trim()
-            .parse::<usize>()
-            .ok()
-            .filter(|n| 0 < *n && *n <= devices.len());
-
-        if let Some(choice) = choice {
-            return Ok(PathBuf::from("/dev").join(&devices[choice - 1].name));
-        } else {
-            error!("Bad choice");
-        }
-    }
+    Ok(PathBuf::from("/dev").join(&devices[selection].name))
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error> {
+fn create(command: CreateCommand) -> Result<(), Error> {
     let presets = presets::Presets::load(&command.presets)?;
 
     let sgdisk = Tool::find("sgdisk")?;
@@ -154,7 +132,7 @@ fn create(command: CreateCommand, running: Arc<AtomicBool>) -> Result<(), Error>
     let storage_device_path = if let Some(path) = command.path {
         path
     } else {
-        select_block_device(running)?
+        select_block_device()?
     };
 
     let image_loop = if let Some(size) = command.image {
@@ -483,17 +461,8 @@ fn main() {
     builder.filter_level(log_level);
     builder.init();
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-
-    ctrlc::set_handler(move || {
-        warn!("Interrupted");
-        r.store(false, Ordering::SeqCst);
-    })
-    .expect("Error setting Ctrl-C handler");
-
     let result = match app.cmd {
-        Command::Create(command) => create(command, running),
+        Command::Create(command) => create(command),
         Command::Chroot(command) => chroot(command),
         Command::Qemu(command) => qemu(command),
     };
