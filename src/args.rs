@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 fn parse_bytes(src: &str) -> Result<Byte, &'static str> {
-    Byte::from_string(src).map_err(|_| "Invalid image size")
+    Byte::from_str(src).map_err(|_| "Invalid image size")
 }
 
 #[derive(StructOpt)]

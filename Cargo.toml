@@ -12,7 +12,7 @@ structopt = "0.2.14"
 tempfile = "3.0.5"
 serde = { version = "1.0.92", features = ["derive"] }
 toml = "0.5.1"
-byte-unit = "2.1.0"
+byte-unit = "3.0.1"
 nix = "0.14.1"
 env_logger = "0.6.2"
 pretty_env_logger = "0.3.0"
