@@ -355,7 +355,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     );
 
     if command.interactive {
-        info!("Dropping you to chroot. Do as you wish to customize the installation");
+        info!("Dropping you to chroot. Do as you wish to customize the installation. Please exit by typing 'exit' instead of using Ctrl+D");
         arch_chroot
             .execute()
             .arg(mount_point.path())
