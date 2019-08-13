@@ -92,8 +92,8 @@ pub enum ErrorKind {
     #[fail(display = "Error setting up a loop device: {}", _0)]
     Losetup(String),
 
-    #[fail(display = "Error querying removeable devices")]
-    RemoveableDevicesQuery,
+    #[fail(display = "Error querying storage devices")]
+    StorageDevicesQuery,
 
     #[fail(display = "There are no removable devices")]
     NoRemovableDevices,

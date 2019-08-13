@@ -15,7 +15,7 @@ pub struct StorageDevice<'a> {
 }
 
 impl<'a> StorageDevice<'a> {
-    pub fn from_path(path: &'a Path) -> Result<Self, Error> {
+    pub fn from_path(path: &'a Path, allow_non_removable: bool) -> Result<Self, Error> {
         debug!("path: {:?}", path);
         let path = path.canonicalize().context(ErrorKind::DeviceQuery)?;
         let device_name = path
@@ -31,7 +31,7 @@ impl<'a> StorageDevice<'a> {
             path,
             origin: PhantomData,
         };
-        if !(_self.is_removable_device()? || _self.is_loop_device()) {
+        if !allow_non_removable && (!(_self.is_removable_device()? || _self.is_loop_device())) {
             return Err(ErrorKind::DangerousDevice)?;
         }
 

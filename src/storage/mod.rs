@@ -12,5 +12,5 @@ pub use filesystem::{Filesystem, FilesystemType};
 pub use loop_device::LoopDevice;
 pub use markers::BlockDevice;
 pub use mount_stack::MountStack;
-pub use removeable_devices::get_removable_devices;
+pub use removeable_devices::get_storage_devices;
 pub use storage_device::StorageDevice;

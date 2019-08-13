@@ -12,6 +12,7 @@ use crate::process::CommandExt;
 use crate::storage::*;
 use crate::tool::Tool;
 use byte_unit::Byte;
+use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, log_enabled, Level, LevelFilter};
@@ -91,11 +92,20 @@ fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, 
     LoopDevice::create(path)
 }
 
-fn select_block_device() -> Result<PathBuf, Error> {
-    let devices = get_removable_devices()?;
+fn select_block_device(allow_non_removable: bool) -> Result<PathBuf, Error> {
+    let devices = get_storage_devices(allow_non_removable)?;
 
     if devices.is_empty() {
         Err(ErrorKind::NoRemovableDevices)?
+    }
+
+    if allow_non_removable {
+        println!(
+            "{}\n",
+            style("Showing non-removable devices. Make sure you select the correct device.")
+                .red()
+                .bold()
+        );
     }
 
     let selection = Select::with_theme(&ColorfulTheme::default())
@@ -132,7 +142,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     let storage_device_path = if let Some(path) = command.path {
         path
     } else {
-        select_block_device()?
+        select_block_device(command.allow_non_removable)?
     };
 
     let image_loop = if let Some(size) = command.image {
@@ -149,6 +159,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
                 loop_dev.path()
             })
             .unwrap_or(&storage_device_path),
+        command.allow_non_removable,
     )?;
 
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
@@ -373,13 +384,18 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let mut cryptsetup;
 
     let mut loop_device: Option<LoopDevice>;
-    let storage_device = match storage::StorageDevice::from_path(&command.block_device) {
-        Ok(b) => b,
-        Err(_) => {
-            loop_device = Some(LoopDevice::create(&command.block_device)?);
-            storage::StorageDevice::from_path(loop_device.as_ref().unwrap().path())?
-        }
-    };
+    let storage_device =
+        match storage::StorageDevice::from_path(&command.block_device, command.allow_non_removable)
+        {
+            Ok(b) => b,
+            Err(_) => {
+                loop_device = Some(LoopDevice::create(&command.block_device)?);
+                storage::StorageDevice::from_path(
+                    loop_device.as_ref().unwrap().path(),
+                    command.allow_non_removable,
+                )?
+            }
+        };
     let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
 
     let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;

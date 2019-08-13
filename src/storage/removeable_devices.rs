@@ -27,22 +27,24 @@ fn trimmed(source: String) -> String {
     String::from(source.trim_end())
 }
 
-pub fn get_removable_devices() -> Result<Vec<Device>, Error> {
+pub fn get_storage_devices(allow_non_removable: bool) -> Result<Vec<Device>, Error> {
     let mut result = Vec::new();
 
-    for entry in fs::read_dir("/sys/block").context(ErrorKind::RemoveableDevicesQuery)? {
-        let entry = entry.context(ErrorKind::RemoveableDevicesQuery)?;
+    for entry in fs::read_dir("/sys/block").context(ErrorKind::StorageDevicesQuery)? {
+        let entry = entry.context(ErrorKind::StorageDevicesQuery)?;
 
-        let removable = fs::read_to_string(entry.path().join("removable"))
-            .context(ErrorKind::RemoveableDevicesQuery)?;
+        let removable = allow_non_removable
+            || fs::read_to_string(entry.path().join("removable"))
+                .map(|v| v == "1\n")
+                .context(ErrorKind::StorageDevicesQuery)?;
 
-        if removable != "1\n" {
+        if !removable {
             continue;
         }
 
         let model = fs::read_to_string(entry.path().join("device/model"))
             .map(trimmed)
-            .context(ErrorKind::RemoveableDevicesQuery)?;
+            .context(ErrorKind::StorageDevicesQuery)?;
 
         if model == "CD-ROM" {
             continue;
@@ -58,10 +60,10 @@ pub fn get_removable_devices() -> Result<Vec<Device>, Error> {
             model,
             vendor: fs::read_to_string(entry.path().join("device/vendor"))
                 .map(trimmed)
-                .context(ErrorKind::RemoveableDevicesQuery)?,
+                .context(ErrorKind::StorageDevicesQuery)?,
             size: Byte::from_bytes(
                 fs::read_to_string(entry.path().join("size"))
-                    .context(ErrorKind::RemoveableDevicesQuery)?
+                    .context(ErrorKind::StorageDevicesQuery)?
                     .trim()
                     .parse::<u128>()
                     .unwrap()

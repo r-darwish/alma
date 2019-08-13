@@ -60,9 +60,16 @@ pub struct CreateCommand {
     )]
     pub image: Option<Byte>,
 
-    /// Overwrite existing image files. Use with caution
+    /// Overwrite existing image files. Use with caution!
     #[structopt(long = "overwrite")]
     pub overwrite: bool,
+
+    /// Allow installation on non-removable devices. Use with extreme caution!
+    ///
+    /// If no device is specified in the command line, the device selection menu will
+    /// show non-removable devices
+    #[structopt(long = "allow-non-removable")]
+    pub allow_non_removable: bool,
 }
 
 #[derive(StructOpt)]
@@ -70,6 +77,10 @@ pub struct ChrootCommand {
     /// Path starting with /dev/disk/by-id for the USB drive
     #[structopt(parse(from_os_str))]
     pub block_device: PathBuf,
+
+    /// Allow installation on non-removable devices. Use with extreme caution!
+    #[structopt(long = "allow-non-removable")]
+    pub allow_non_removable: bool,
 
     /// Optional command to run
     #[structopt()]
