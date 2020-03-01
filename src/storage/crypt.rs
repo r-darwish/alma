@@ -1,8 +1,7 @@
 use super::markers::BlockDevice;
-use crate::error::{Error, ErrorKind};
 use crate::process::CommandExt;
 use crate::tool::Tool;
-use failure::ResultExt;
+use anyhow::{anyhow, Result};
 use log::{debug, warn};
 use std::fs;
 use std::io::Read;
@@ -21,14 +20,14 @@ pub struct EncryptedDevice<'t, 'o> {
 }
 
 impl<'t, 'o> EncryptedDevice<'t, 'o> {
-    pub fn prepare(cryptsetup: &Tool, device: &dyn BlockDevice) -> Result<(), Error> {
+    pub fn prepare(cryptsetup: &Tool, device: &dyn BlockDevice) -> Result<()> {
         debug!("Preparing encrypted device in {}", device.path().display());
         cryptsetup
             .execute()
             .arg("luksFormat")
             .arg("-q")
             .arg(device.path())
-            .run(ErrorKind::LuksSetup)?;
+            .run(anyhow!("LUKS setup failed"))?;
 
         Ok(())
     }
@@ -37,7 +36,7 @@ impl<'t, 'o> EncryptedDevice<'t, 'o> {
         cryptsetup: &'t Tool,
         device: &'o dyn BlockDevice,
         name: String,
-    ) -> Result<EncryptedDevice<'t, 'o>, Error> {
+    ) -> Result<EncryptedDevice<'t, 'o>> {
         debug!(
             "Opening encrypted device {} as {}",
             device.path().display(),
@@ -48,7 +47,7 @@ impl<'t, 'o> EncryptedDevice<'t, 'o> {
             .arg("open")
             .arg(device.path())
             .arg(&name)
-            .run(ErrorKind::LuksOpen)?;
+            .run(anyhow!("Error opening LUKS"))?;
 
         let path = PathBuf::from("/dev/mapper").join(&name);
         Ok(Self {
@@ -59,13 +58,13 @@ impl<'t, 'o> EncryptedDevice<'t, 'o> {
         })
     }
 
-    fn _close(&mut self) -> Result<(), Error> {
+    fn _close(&mut self) -> Result<()> {
         debug!("Closing encrypted device {}", self.name);
         self.cryptsetup
             .execute()
             .arg("close")
             .arg(&self.name)
-            .run(ErrorKind::LuksClose)?;
+            .run(anyhow!("Error closing LUKS"))?;
 
         Ok(())
     }
@@ -85,16 +84,14 @@ impl<'t, 'o> BlockDevice for EncryptedDevice<'t, 'o> {
     }
 }
 
-pub fn is_encrypted_device(device: &dyn BlockDevice) -> Result<bool, Error> {
+pub fn is_encrypted_device(device: &dyn BlockDevice) -> Result<bool> {
     let mut f = fs::OpenOptions::new()
         .read(true)
         .write(false)
-        .open(device.path())
-        .context(ErrorKind::LuksDetection)?;
+        .open(device.path())?;
 
     let mut buffer = [0; 6];
-    f.read_exact(&mut buffer)
-        .context(ErrorKind::LuksDetection)?;
+    f.read_exact(&mut buffer)?;
 
     Ok(buffer == LUKS_MAGIC_1 || buffer == LUKS_MAGIC_2)
 }

@@ -1,5 +1,4 @@
 mod args;
-mod error;
 mod initcpio;
 mod presets;
 mod process;
@@ -7,14 +6,13 @@ mod storage;
 mod tool;
 
 use crate::args::*;
-use crate::error::*;
 use crate::process::CommandExt;
 use crate::storage::*;
 use crate::tool::Tool;
+use anyhow::{anyhow, Result};
 use byte_unit::Byte;
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
-use failure::{Fail, ResultExt};
 use log::{debug, error, info, log_enabled, Level, LevelFilter};
 use pretty_env_logger;
 use std::collections::HashSet;
@@ -41,7 +39,7 @@ fn mount<'a>(
     mount_path: &Path,
     boot_filesystem: &'a Filesystem,
     root_filesystem: &'a Filesystem,
-) -> Result<MountStack<'a>, Error> {
+) -> Result<MountStack<'a>> {
     let mut mount_stack = MountStack::new();
     debug!(
         "Root partition: {}",
@@ -49,18 +47,14 @@ fn mount<'a>(
     );
 
     info!("Mounting filesystems to {}", mount_path.display());
-    mount_stack
-        .mount(&root_filesystem, mount_path.into(), None)
-        .context(ErrorKind::Mounting)?;
+    mount_stack.mount(&root_filesystem, mount_path.into(), None)?;
 
     let boot_point = mount_path.join("boot");
     if !boot_point.exists() {
-        fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
+        fs::create_dir(&boot_point)?;
     }
 
-    mount_stack
-        .mount(&boot_filesystem, boot_point, None)
-        .context(ErrorKind::Mounting)?;
+    mount_stack.mount(&boot_filesystem, boot_point, None)?;
 
     Ok(mount_stack)
 }
@@ -73,7 +67,7 @@ fn fix_fstab(fstab: &str) -> String {
         .join("\n")
 }
 
-fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, Error> {
+fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice> {
     {
         let mut options = fs::OpenOptions::new();
 
@@ -83,20 +77,19 @@ fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, 
         } else {
             options.create_new(true);
         }
-        let file = options.open(path).context(ErrorKind::Image)?;
+        let file = options.open(path)?;
 
-        file.set_len(size.get_bytes() as u64)
-            .context(ErrorKind::Image)?;
+        file.set_len(size.get_bytes() as u64)?;
     }
 
     LoopDevice::create(path)
 }
 
-fn select_block_device(allow_non_removable: bool) -> Result<PathBuf, Error> {
+fn select_block_device(allow_non_removable: bool) -> Result<PathBuf> {
     let devices = get_storage_devices(allow_non_removable)?;
 
     if devices.is_empty() {
-        Err(ErrorKind::NoRemovableDevices)?
+        return Err(anyhow!("No removable devices"));
     }
 
     if allow_non_removable {
@@ -119,7 +112,7 @@ fn select_block_device(allow_non_removable: bool) -> Result<PathBuf, Error> {
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn create(command: CreateCommand) -> Result<(), Error> {
+fn create(command: CreateCommand) -> Result<()> {
     let presets = presets::Presets::load(&command.presets)?;
 
     let sgdisk = Tool::find("sgdisk")?;
@@ -162,7 +155,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
         command.allow_non_removable,
     )?;
 
-    let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
+    let mount_point = tempdir()?;
     let disk_path = storage_device.path();
 
     info!("Partitioning the block device");

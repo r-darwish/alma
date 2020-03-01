@@ -1,6 +1,5 @@
 use super::Filesystem;
-use crate::error::{Error, ErrorKind};
-use failure::Fail;
+use anyhow::Result;
 use log::{debug, warn};
 use nix;
 use nix::mount::{mount, umount, MsFlags};
@@ -40,21 +39,21 @@ impl<'a> MountStack<'a> {
         Ok(())
     }
 
-    fn _umount(&mut self) -> Result<(), Error> {
+    fn _umount(&mut self) -> Result<()> {
         let mut result = Ok(());
 
         while let Some(target) = self.targets.pop() {
             debug!("Unmounting {}", target.display());
             if let Err(e) = umount(&target) {
                 warn!("Unable to umount {}: {}", target.display(), e);
-                result = Err(Error::from(e.context(ErrorKind::UmountFailure)));
+                result = Err(e.into());
             };
         }
 
         result
     }
 
-    pub fn umount(mut self) -> Result<(), Error> {
+    pub fn umount(mut self) -> Result<()> {
         self._umount()
     }
 }

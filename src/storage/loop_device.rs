@@ -1,6 +1,5 @@
-use crate::error::{Error, ErrorKind};
 use crate::tool::Tool;
-use failure::ResultExt;
+use anyhow::{anyhow, Result};
 use log::info;
 use std::path::{Path, PathBuf};
 
@@ -11,19 +10,16 @@ pub struct LoopDevice {
 }
 
 impl LoopDevice {
-    pub fn create(file: &Path) -> Result<Self, Error> {
+    pub fn create(file: &Path) -> Result<Self> {
         let losetup = Tool::find("losetup")?;
         let output = losetup
             .execute()
             .args(&["--find", "-P", "--show"])
             .arg(file)
-            .output()
-            .context(ErrorKind::Image)?;
+            .output()?;
 
         if !output.status.success() {
-            Err(ErrorKind::Losetup(
-                String::from_utf8(output.stderr).unwrap(),
-            ))?
+            return Err(anyhow!("{}", String::from_utf8(output.stderr).unwrap(),));
         }
 
         let path = PathBuf::from(String::from_utf8(output.stdout).unwrap().trim());
