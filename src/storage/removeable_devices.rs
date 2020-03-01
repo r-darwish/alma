@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn sanity() {
-        let devices = get_removable_devices().unwrap();
+        let devices = get_storage_devices(false).unwrap();
         println!("{:?}", devices);
     }
 }

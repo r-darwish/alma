@@ -202,9 +202,9 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     };
 
     let root_partition = if let Some(e) = encrypted_root.as_ref() {
-        e as &BlockDevice
+        e as &dyn BlockDevice
     } else {
-        &root_partition_base as &BlockDevice
+        &root_partition_base as &dyn BlockDevice
     };
 
     let root_filesystem = Filesystem::format(root_partition, FilesystemType::Ext4, &mkext4)?;
@@ -381,9 +381,9 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
 fn chroot(command: ChrootCommand) -> Result<(), Error> {
     let arch_chroot = Tool::find("arch-chroot")?;
-    let mut cryptsetup;
+    let cryptsetup;
 
-    let mut loop_device: Option<LoopDevice>;
+    let loop_device: Option<LoopDevice>;
     let storage_device =
         match storage::StorageDevice::from_path(&command.block_device, command.allow_non_removable)
         {
@@ -414,9 +414,9 @@ fn chroot(command: ChrootCommand) -> Result<(), Error> {
     };
 
     let root_partition = if let Some(e) = encrypted_root.as_ref() {
-        e as &BlockDevice
+        e as &dyn BlockDevice
     } else {
-        &root_partition_base as &BlockDevice
+        &root_partition_base as &dyn BlockDevice
     };
     let root_filesystem = Filesystem::from_partition(root_partition, FilesystemType::Ext4);
 
@@ -491,7 +491,7 @@ fn main() {
         }
         Err(error) => {
             error!("{}", error);
-            for cause in (&error as &Fail).iter_causes() {
+            for cause in (&error as &dyn Fail).iter_causes() {
                 error!("Caused by: {}", cause);
             }
             exit(1);

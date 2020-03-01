@@ -54,7 +54,7 @@ pub struct CreateCommand {
     /// Create an image with a certain size in the given path instead of using an actual block device
     #[structopt(
         long = "image",
-        parse(try_from_str = "parse_bytes"),
+        parse(try_from_str = parse_bytes),
         value_name = "size",
         requires = "path"
     )]

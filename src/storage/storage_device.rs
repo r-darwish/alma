@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 pub struct StorageDevice<'a> {
     name: String,
     path: PathBuf,
-    origin: PhantomData<&'a Origin>,
+    origin: PhantomData<&'a dyn Origin>,
 }
 
 impl<'a> StorageDevice<'a> {

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub struct Partition<'a> {
     path: PathBuf,
-    origin: PhantomData<&'a Origin>,
+    origin: PhantomData<&'a dyn Origin>,
 }
 
 impl<'a> Partition<'a> {

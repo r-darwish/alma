@@ -17,11 +17,11 @@ pub struct EncryptedDevice<'t, 'o> {
     cryptsetup: &'t Tool,
     name: String,
     path: PathBuf,
-    origin: PhantomData<&'o BlockDevice>,
+    origin: PhantomData<&'o dyn BlockDevice>,
 }
 
 impl<'t, 'o> EncryptedDevice<'t, 'o> {
-    pub fn prepare(cryptsetup: &Tool, device: &BlockDevice) -> Result<(), Error> {
+    pub fn prepare(cryptsetup: &Tool, device: &dyn BlockDevice) -> Result<(), Error> {
         debug!("Preparing encrypted device in {}", device.path().display());
         cryptsetup
             .execute()
@@ -35,7 +35,7 @@ impl<'t, 'o> EncryptedDevice<'t, 'o> {
 
     pub fn open(
         cryptsetup: &'t Tool,
-        device: &'o BlockDevice,
+        device: &'o dyn BlockDevice,
         name: String,
     ) -> Result<EncryptedDevice<'t, 'o>, Error> {
         debug!(
@@ -85,7 +85,7 @@ impl<'t, 'o> BlockDevice for EncryptedDevice<'t, 'o> {
     }
 }
 
-pub fn is_encrypted_device(device: &BlockDevice) -> Result<bool, Error> {
+pub fn is_encrypted_device(device: &dyn BlockDevice) -> Result<bool, Error> {
     let mut f = fs::OpenOptions::new()
         .read(true)
         .write(false)

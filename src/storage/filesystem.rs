@@ -23,12 +23,12 @@ impl FilesystemType {
 #[derive(Debug)]
 pub struct Filesystem<'a> {
     fs_type: FilesystemType,
-    block: &'a BlockDevice,
+    block: &'a dyn BlockDevice,
 }
 
 impl<'a> Filesystem<'a> {
     pub fn format(
-        block: &'a BlockDevice,
+        block: &'a dyn BlockDevice,
         fs_type: FilesystemType,
         mkfs: &Tool,
     ) -> Result<Self, Error> {
@@ -43,11 +43,11 @@ impl<'a> Filesystem<'a> {
         Ok(Self { fs_type, block })
     }
 
-    pub fn from_partition(block: &'a BlockDevice, fs_type: FilesystemType) -> Self {
+    pub fn from_partition(block: &'a dyn BlockDevice, fs_type: FilesystemType) -> Self {
         Self { fs_type, block }
     }
 
-    pub fn block(&self) -> &BlockDevice {
+    pub fn block(&self) -> &dyn BlockDevice {
         self.block
     }
 
