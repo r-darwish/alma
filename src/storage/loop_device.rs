@@ -21,9 +21,7 @@ impl LoopDevice {
             .context(ErrorKind::Image)?;
 
         if !output.status.success() {
-            Err(ErrorKind::Losetup(
-                String::from_utf8(output.stderr).unwrap(),
-            ))?
+            return Err(ErrorKind::Losetup(String::from_utf8(output.stderr).unwrap()).into());
         }
 
         let path = PathBuf::from(String::from_utf8(output.stdout).unwrap().trim());

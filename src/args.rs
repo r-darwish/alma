@@ -2,6 +2,8 @@ use byte_unit::Byte;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+/// Parse size argument as bytes
+/// e.g. 10GB, 10GiB, etc.
 fn parse_bytes(src: &str) -> Result<Byte, &'static str> {
     Byte::from_str(src).map_err(|_| "Invalid image size")
 }

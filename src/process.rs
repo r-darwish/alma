@@ -1,4 +1,4 @@
-use super::error::*;
+use super::error::{Error, ErrorKind};
 use failure::{Fail, ResultExt};
 use log::error;
 use std::process::{Command, ExitStatus};

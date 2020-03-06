@@ -5,10 +5,8 @@ use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use toml;
 
 #[derive(Deserialize)]
-
 struct Preset {
     packages: Option<Vec<String>>,
     script: Option<String>,
@@ -24,12 +22,12 @@ impl Preset {
     }
 }
 
-pub struct Presets {
+pub struct PresetsCollection {
     pub packages: HashSet<String>,
     pub scripts: Vec<String>,
 }
 
-impl Presets {
+impl PresetsCollection {
     pub fn load(list: &[PathBuf]) -> Result<Self, Error> {
         let mut packages = HashSet::new();
         let mut scripts = Vec::new();
@@ -59,7 +57,7 @@ impl Presets {
             .collect();
 
         if !missing_envrionments.is_empty() {
-            Err(ErrorKind::MissingEnvironmentVariables(missing_envrionments))?
+            return Err(ErrorKind::MissingEnvironmentVariables(missing_envrionments).into());
         }
 
         Ok(Self { packages, scripts })

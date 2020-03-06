@@ -31,8 +31,11 @@ impl<'a> StorageDevice<'a> {
             path,
             origin: PhantomData,
         };
-        if !allow_non_removable && (!(_self.is_removable_device()? || _self.is_loop_device())) {
-            return Err(ErrorKind::DangerousDevice)?;
+
+        // If we only allow removable/loop devices, and the device is neither removable or a loop
+        // device then throw a DangerousDevice error
+        if !(allow_non_removable || _self.is_removable_device()? || _self.is_loop_device()) {
+            return Err(ErrorKind::DangerousDevice.into());
         }
 
         Ok(_self)
