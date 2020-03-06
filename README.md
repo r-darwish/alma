@@ -19,6 +19,7 @@ You can either build the project using cargo build or install the `alma` package
 
 ## Usage
 
+### Image creation on removable device
 ``` shell
 sudo alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 ```
@@ -26,17 +27,105 @@ sudo alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
 This will wipe the entire disk and create a bootable installation of Arch Linux. You can use either
 removable devices or loop devices. As a precaution, ALMA will not wipe non-removable devices.
 
-After the installation is done you can either boot from it immediately or use `arch-chroot` to
-perform further customizations before your first boot.
-
 Not specifying any path will cause ALMA to interactively prompt the user for a removable device.
+
+### Disk encryption
+
+You can enable disk encryption with the `-e` flag:
+
+``` shell
+sudo alma create -e  /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
+```
+
+You will be prompted to enter and confirm the encryption passphrase during image creation.
+
+### chroot
+
+After the installation is done you can either boot from it immediately or use `arch-chroot` to
+perform further customizations before your first boot (e.g. installing wireless device drivers).
+
+You can run `arch-chroot` via ALMA:
+
+``` shell
+sudo alma chroot /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0
+```
+
+### Create raw image and boot in qemu
+
+For development and testing it may be useful to generate and boot the image in qemu.
+
+Creating a 10GiB raw image, with disk encryption:
+
+``` shell
+sudo alma create -e --image 10GiB almatest.img
+```
+
+If you receive the following error:
+```
+Error setting up a loop device: losetup: cannot find an unused loop device
+```
+
+Check that you are running ALMA with sudo privileges, and reboot if you have installed a kernel update since your last reboot.
+
+Mounting the raw image to a loop device:
+
+``` shell
+sudo losetup -f ./almatest.img
+```
+
+Check loop device:
+``` shell
+ sudo losetup -j ./almatest.img
+```
+```
+/dev/loop0: [2070]:6865917 (/path/to/image/almatest.img)
+```
+Note that your loop device number may differ.
+
+Run qemu via ALMA:
+``` shell
+sudo alma qemu /dev/loop0
+```
+
+This will boot the image in qemu.
 
 ## Presets
 
-Reproducing a build can be easily done using a preset file. Presets file are simple TOML file which
-contain a list of packages to install, a post-installation script and environment variables required
-by the preset. See the presets directory for examples.
+Reproducing a build can be easily done using a preset file.
+
+Preset files are simple TOML files which contain:
+* A list of packages to install: `packages = ["mypackage"]`
+* A post-installation script: `script = """ ... """`
+* Environment variables required by the preset (e.g. used in the script): `enironment_variables = ["USERNAME"]`
+
+See the presets directory for examples.
+
+Presets are used via the `--presets` argument (multiple preset files may be provided):
+
+``` shell
+sudo ALMA_USER=archie alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0 --presets ./presets/user.toml ./presets/custom_preset.toml
+```
+
+Example preset TOML:
+
+``` toml
+packages = ["sudo"]
+script = """
+set -eux
+useradd -m ${ALMA_USER}
+passwd ${ALMA_USER}
+usermod -G wheel -a ${ALMA_USER}
+"""
+environment_variables = ["ALMA_USER"]
+```
+
+Preset scripts are executed in the same order they are provided.
 
 ## Similar projects
 
 * [NomadBSD](http://nomadbsd.org/)
+
+## Useful Resources
+
+* [Arch Wiki: Installing Arch Linux on a USB key](https://wiki.archlinux.org/index.php/Install_Arch_Linux_on_a_USB_key)
+* [ValleyCat's Arch Linux USB guide](http://valleycat.org/linux/arch-usb.html?i=1)
