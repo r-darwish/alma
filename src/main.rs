@@ -1,4 +1,5 @@
 mod args;
+mod constants;
 mod error;
 mod initcpio;
 mod presets;
@@ -6,65 +7,71 @@ mod process;
 mod storage;
 mod tool;
 
-use crate::args::*;
-use crate::error::*;
-use crate::process::CommandExt;
-use crate::storage::*;
-use crate::tool::Tool;
+use args::Command;
 use byte_unit::Byte;
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
+use error::Error;
+use error::ErrorKind;
 use failure::{Fail, ResultExt};
 use log::{debug, error, info, log_enabled, Level, LevelFilter};
-use pretty_env_logger;
+use process::CommandExt;
 use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
-use std::os::unix::{fs::PermissionsExt, process::CommandExt as UnixCommandExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command as ProcessCommand};
 use std::thread;
 use std::time::Duration;
+use storage::EncryptedDevice;
+use storage::{BlockDevice, Filesystem, FilesystemType, LoopDevice};
 use structopt::StructOpt;
 use tempfile::tempdir;
+use tool::Tool;
 
-const BOOT_PARTITION_INDEX: u8 = 1;
-const ROOT_PARTITION_INDEX: u8 = 3;
+fn main() {
+    // Get struct of args using structopt
+    let app = args::App::from_args();
 
-static JOURNALD_CONF: &'static str = "
-[Journal]
-Storage=volatile
-SystemMaxUse=16M
-";
+    // Set up logging
+    let mut builder = pretty_env_logger::formatted_timed_builder();
+    let log_level = if app.verbose {
+        LevelFilter::Debug
+    } else {
+        LevelFilter::Info
+    };
+    builder.filter_level(log_level);
+    builder.init();
 
-fn mount<'a>(
-    mount_path: &Path,
-    boot_filesystem: &'a Filesystem,
-    root_filesystem: &'a Filesystem,
-) -> Result<MountStack<'a>, Error> {
-    let mut mount_stack = MountStack::new();
-    debug!(
-        "Root partition: {}",
-        root_filesystem.block().path().display()
-    );
+    // Match command from arguments and run relevant code
+    let result = match app.cmd {
+        Command::Create(command) => create(command),
+        Command::Chroot(command) => tool::chroot(command),
+        Command::Qemu(command) => tool::qemu(command),
+    };
 
-    info!("Mounting filesystems to {}", mount_path.display());
-    mount_stack
-        .mount(&root_filesystem, mount_path.into(), None)
-        .context(ErrorKind::Mounting)?;
-
-    let boot_point = mount_path.join("boot");
-    if !boot_point.exists() {
-        fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
+    // Check if command return an Error
+    // Print all causes to stderr if so
+    match result {
+        Ok(()) => {
+            exit(0);
+        }
+        Err(error) => {
+            error!("{}", error);
+            for cause in (&error as &dyn Fail).iter_causes() {
+                error!("Caused by: {}", cause);
+            }
+            exit(1);
+        }
     }
-
-    mount_stack
-        .mount(&boot_filesystem, boot_point, None)
-        .context(ErrorKind::Mounting)?;
-
-    Ok(mount_stack)
 }
 
+/// Remove swap entry from fstab and any commented lines
+/// Returns an owned String
+///
+/// # Arguments
+/// * `fstab` - A string slice holding the contents of the fstab file
 fn fix_fstab(fstab: &str) -> String {
     fstab
         .lines()
@@ -73,6 +80,7 @@ fn fix_fstab(fstab: &str) -> String {
         .join("\n")
 }
 
+/// Creates a file at the path provided, and mounts it to a loop device
 fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, Error> {
     {
         let mut options = fs::OpenOptions::new();
@@ -92,11 +100,12 @@ fn create_image(path: &Path, size: Byte, overwrite: bool) -> Result<LoopDevice, 
     LoopDevice::create(path)
 }
 
+/// Requests selection of block device (no device was given in the arguments)
 fn select_block_device(allow_non_removable: bool) -> Result<PathBuf, Error> {
-    let devices = get_storage_devices(allow_non_removable)?;
+    let devices = storage::get_storage_devices(allow_non_removable)?;
 
     if devices.is_empty() {
-        Err(ErrorKind::NoRemovableDevices)?
+        return Err(ErrorKind::NoRemovableDevices.into());
     }
 
     if allow_non_removable {
@@ -118,9 +127,10 @@ fn select_block_device(allow_non_removable: bool) -> Result<PathBuf, Error> {
     Ok(PathBuf::from("/dev").join(&devices[selection].name))
 }
 
-#[allow(clippy::cognitive_complexity)]
-fn create(command: CreateCommand) -> Result<(), Error> {
-    let presets = presets::Presets::load(&command.presets)?;
+/// Creates the installation
+#[allow(clippy::cognitive_complexity)] // TODO: Split steps into functions and remove this
+fn create(command: args::CreateCommand) -> Result<(), Error> {
+    let presets = presets::PresetsCollection::load(&command.presets)?;
 
     let sgdisk = Tool::find("sgdisk")?;
     let pacstrap = Tool::find("pacstrap")?;
@@ -185,10 +195,10 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     thread::sleep(Duration::from_millis(1000));
 
     info!("Formatting filesystems");
-    let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;
+    let boot_partition = storage_device.get_partition(constants::BOOT_PARTITION_INDEX)?;
     let boot_filesystem = Filesystem::format(&boot_partition, FilesystemType::Vfat, &mkfat)?;
 
-    let root_partition_base = storage_device.get_partition(ROOT_PARTITION_INDEX)?;
+    let root_partition_base = storage_device.get_partition(constants::ROOT_PARTITION_INDEX)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
         info!("Encrypting the root filesystem");
         EncryptedDevice::prepare(&cryptsetup, &root_partition_base)?;
@@ -209,7 +219,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
 
     let root_filesystem = Filesystem::format(root_partition, FilesystemType::Ext4, &mkext4)?;
 
-    let mount_stack = mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
+    let mount_stack = tool::mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
 
     if log_enabled!(Level::Debug) {
         debug!("lsblk:");
@@ -223,17 +233,10 @@ fn create(command: CreateCommand) -> Result<(), Error> {
             .ok();
     }
 
-    let mut packages: HashSet<String> = [
-        "base",
-        "grub",
-        "efibootmgr",
-        "intel-ucode",
-        "networkmanager",
-        "broadcom-wl",
-    ]
-    .iter()
-    .map(|s| String::from(*s))
-    .collect();
+    let mut packages: HashSet<String> = constants::BASE_PACKAGES
+        .iter()
+        .map(|s| String::from(*s))
+        .collect();
 
     packages.extend(presets.packages);
 
@@ -292,7 +295,7 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     info!("Configuring journald");
     fs::write(
         mount_point.path().join("etc/systemd/journald.conf"),
-        JOURNALD_CONF,
+        constants::JOURNALD_CONF,
     )
     .context(ErrorKind::PostInstallation)?;
 
@@ -377,124 +380,4 @@ fn create(command: CreateCommand) -> Result<(), Error> {
     mount_stack.umount()?;
 
     Ok(())
-}
-
-fn chroot(command: ChrootCommand) -> Result<(), Error> {
-    let arch_chroot = Tool::find("arch-chroot")?;
-    let cryptsetup;
-
-    let loop_device: Option<LoopDevice>;
-    let storage_device =
-        match storage::StorageDevice::from_path(&command.block_device, command.allow_non_removable)
-        {
-            Ok(b) => b,
-            Err(_) => {
-                loop_device = Some(LoopDevice::create(&command.block_device)?);
-                storage::StorageDevice::from_path(
-                    loop_device.as_ref().unwrap().path(),
-                    command.allow_non_removable,
-                )?
-            }
-        };
-    let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
-
-    let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;
-    let boot_filesystem = Filesystem::from_partition(&boot_partition, FilesystemType::Vfat);
-
-    let root_partition_base = storage_device.get_partition(ROOT_PARTITION_INDEX)?;
-    let encrypted_root = if is_encrypted_device(&root_partition_base)? {
-        cryptsetup = Some(Tool::find("cryptsetup")?);
-        Some(EncryptedDevice::open(
-            cryptsetup.as_ref().unwrap(),
-            &root_partition_base,
-            "alma_root".into(),
-        )?)
-    } else {
-        None
-    };
-
-    let root_partition = if let Some(e) = encrypted_root.as_ref() {
-        e as &dyn BlockDevice
-    } else {
-        &root_partition_base as &dyn BlockDevice
-    };
-    let root_filesystem = Filesystem::from_partition(root_partition, FilesystemType::Ext4);
-
-    let mount_stack = mount(mount_point.path(), &boot_filesystem, &root_filesystem)?;
-
-    arch_chroot
-        .execute()
-        .arg(mount_point.path())
-        .args(&command.command)
-        .run(ErrorKind::Interactive)?;
-
-    info!("Unmounting filesystems");
-    mount_stack.umount()?;
-
-    Ok(())
-}
-
-fn qemu(command: QemuCommand) -> Result<(), Error> {
-    let qemu = Tool::find("qemu-system-x86_64")?;
-
-    let mut run = qemu.execute();
-    run.args(&[
-        "-m",
-        "4G",
-        "-netdev",
-        "user,id=user.0",
-        "-device",
-        "virtio-net-pci,netdev=user.0",
-        "-device",
-        "qemu-xhci,id=xhci",
-        "-device",
-        "usb-tablet,bus=xhci.0",
-        "-drive",
-    ])
-    .arg(format!(
-        "file={},if=virtio,format=raw",
-        command.block_device.display()
-    ))
-    .args(command.args);
-
-    if PathBuf::from("/dev/kvm").exists() {
-        debug!("KVM is enabled");
-        run.args(&["-enable-kvm", "-cpu", "host"]);
-    }
-
-    let err = run.exec();
-
-    Err(err).context(ErrorKind::Qemu)?
-}
-
-fn main() {
-    let app = App::from_args();
-
-    let mut builder = pretty_env_logger::formatted_timed_builder();
-    let log_level = if app.verbose {
-        LevelFilter::Debug
-    } else {
-        LevelFilter::Info
-    };
-    builder.filter_level(log_level);
-    builder.init();
-
-    let result = match app.cmd {
-        Command::Create(command) => create(command),
-        Command::Chroot(command) => chroot(command),
-        Command::Qemu(command) => qemu(command),
-    };
-
-    match result {
-        Ok(()) => {
-            exit(0);
-        }
-        Err(error) => {
-            error!("{}", error);
-            for cause in (&error as &dyn Fail).iter_causes() {
-                error!("Caused by: {}", cause);
-            }
-            exit(1);
-        }
-    }
 }

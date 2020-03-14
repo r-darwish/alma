@@ -2,7 +2,6 @@ use super::Filesystem;
 use crate::error::{Error, ErrorKind};
 use failure::Fail;
 use log::{debug, warn};
-use nix;
 use nix::mount::{mount, umount, MsFlags};
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -20,7 +19,6 @@ impl<'a> MountStack<'a> {
         }
     }
 
-    #[must_use]
     pub fn mount(
         &mut self,
         filesystem: &'a Filesystem,
