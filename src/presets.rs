@@ -14,7 +14,6 @@ struct Preset {
     environment_variables: Option<Vec<String>>,
 }
 
-// TODO Build vector of paths to files, then sort by path name
 fn visit_dirs(dir: &Path, filevec: &mut Vec<PathBuf>) -> Result<(), io::Error> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
@@ -69,6 +68,7 @@ impl PresetsCollection {
 
         for preset in list {
             if preset.is_dir() {
+                // Build vector of paths to files, then sort by path name
                 // Recursively load directories of preset files
                 let mut dir_paths: Vec<PathBuf> = Vec::new();
                 visit_dirs(&preset, &mut dir_paths)
