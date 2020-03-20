@@ -138,6 +138,9 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
     let genfstab = Tool::find("genfstab")?;
     let mkfat = Tool::find("mkfs.fat")?;
     let mkext4 = Tool::find("mkfs.ext4")?;
+    let raw_mount = Tool::find("mount")?;
+    let raw_umount = Tool::find("umount")?;
+    let mkdir = Tool::find("mkdir")?;
     let cryptsetup = if command.encrypted_root {
         Some(Tool::find("cryptsetup")?)
     } else {
@@ -264,10 +267,52 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
     }
 
     for script in presets.scripts {
+        if let Some(shared_dirs) = &script.shared_dirs {
+            for dir in shared_dirs {
+                // Copy shared directories to /tmp since bind mount is not read-only
+                mkdir
+                    .execute()
+                    .arg("-p")
+                    .arg(PathBuf::from("/tmp/alma_shared_dirs/").join(dir.file_name().unwrap()))
+                    .run(ErrorKind::PostInstallation)?;
+
+                std::process::Command::new("cp")
+                    .arg("-r")
+                    .arg(&dir)
+                    .arg(PathBuf::from("/tmp/alma_shared_dirs/"))
+                    .run(ErrorKind::PostInstallation)?;
+
+                // Create shared directories mount points inside chroot
+                mkdir
+                    .execute()
+                    .arg("-p")
+                    .arg(
+                        mount_point
+                            .path()
+                            .join(PathBuf::from("shared_dirs/"))
+                            .join(dir.file_name().unwrap()),
+                    )
+                    .run(ErrorKind::PostInstallation)?;
+
+                // Bind mount shared directories
+                raw_mount
+                    .execute()
+                    .arg("--bind")
+                    .arg(PathBuf::from("/tmp/alma_shared_dirs/").join(dir.file_name().unwrap()))
+                    .arg(
+                        mount_point
+                            .path()
+                            .join(PathBuf::from("shared_dirs/"))
+                            .join(dir.file_name().unwrap()),
+                    )
+                    .run(ErrorKind::PostInstallation)?;
+            }
+        }
+
         let mut script_file =
             tempfile::NamedTempFile::new_in(mount_point.path()).context(ErrorKind::PresetScript)?;
         script_file
-            .write_all(script.as_bytes())
+            .write_all(script.script_text.as_bytes())
             .and_then(|_| script_file.as_file_mut().metadata())
             .and_then(|metadata| {
                 let mut permissions = metadata.permissions();
@@ -282,6 +327,21 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
             .arg(mount_point.path())
             .arg(Path::new("/").join(script_path.file_name().unwrap()))
             .run(ErrorKind::PostInstallation)?;
+
+        if let Some(shared_dirs) = &script.shared_dirs {
+            // Unmount shared dirs
+            for dir in shared_dirs {
+                raw_umount
+                    .execute()
+                    .arg(
+                        mount_point
+                            .path()
+                            .join(PathBuf::from("shared_dirs/"))
+                            .join(dir.file_name().unwrap()),
+                    )
+                    .run(ErrorKind::PostInstallation)?;
+            }
+        }
     }
 
     info!("Performing post installation tasks");

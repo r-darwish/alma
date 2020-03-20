@@ -11,6 +11,7 @@ struct Preset {
     packages: Option<Vec<String>>,
     script: Option<String>,
     environment_variables: Option<Vec<String>>,
+    shared_directories: Option<Vec<PathBuf>>,
 }
 
 impl Preset {
@@ -22,15 +23,20 @@ impl Preset {
     }
 }
 
+pub struct Script {
+    pub script_text: String,
+    pub shared_dirs: Option<Vec<PathBuf>>,
+}
+
 pub struct PresetsCollection {
     pub packages: HashSet<String>,
-    pub scripts: Vec<String>,
+    pub scripts: Vec<Script>,
 }
 
 impl PresetsCollection {
     pub fn load(list: &[PathBuf]) -> Result<Self, Error> {
         let mut packages = HashSet::new();
-        let mut scripts = Vec::new();
+        let mut scripts: Vec<Script> = Vec::new();
         let mut environment_variables = HashSet::new();
 
         for preset in list {
@@ -38,6 +44,7 @@ impl PresetsCollection {
                 script,
                 packages: preset_packages,
                 environment_variables: preset_environment_variables,
+                shared_directories: preset_shared_dirs,
             } = Preset::load(&preset)?;
 
             if let Some(preset_packages) = preset_packages {
@@ -48,7 +55,33 @@ impl PresetsCollection {
                 environment_variables.extend(preset_environment_variables);
             }
 
-            scripts.extend(script);
+            if let Some(script) = script {
+                scripts.push(Script {
+                    script_text: script,
+
+                    shared_dirs: preset_shared_dirs
+                        .map(|x| {
+                            // Convert directories to absolute paths
+                            // If any shared directory is not a directory then throw an error
+                            x.iter()
+                                .cloned()
+                                .map(|y| {
+                                    let full_path = preset.parent().unwrap().join(&y);
+                                    if full_path.is_dir() {
+                                        Ok(full_path)
+                                    } else {
+                                        Err(ErrorKind::Preset(format!(
+                                            "Preset: {} - shared directory: {} is not directory",
+                                            preset.to_string_lossy(),
+                                            y.to_string_lossy()
+                                        )))
+                                    }
+                                })
+                                .collect::<Result<Vec<_>, ErrorKind>>()
+                        })
+                        .map_or(Ok(None), |r| r.map(Some))?,
+                });
+            }
         }
 
         let missing_envrionments: Vec<String> = environment_variables
