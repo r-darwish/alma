@@ -37,7 +37,7 @@ pub struct CreateCommand {
     #[structopt(parse(from_os_str))]
     pub path: Option<PathBuf>,
 
-    /// Additional pacakges to install
+    /// Additional packages to install
     #[structopt(short = "p", long = "extra-packages", value_name = "package")]
     pub extra_packages: Vec<String>,
 

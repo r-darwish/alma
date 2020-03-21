@@ -100,10 +100,23 @@ Preset files are simple TOML files which contain:
 
 See the presets directory for examples.
 
-Presets are used via the `--presets` argument (multiple preset files may be provided):
+Presets are used via the `--presets` argument (multiple preset files or directories may be provided):
 
 ``` shell
 sudo ALMA_USER=archie alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0 --presets ./presets/user.toml ./presets/custom_preset.toml
+```
+
+If a directory is provided, then all files and subdirectories in the directory are recursively crawled in alphanumeric order (all files must be ALMA .toml files). This allows you to use the following structure to compose many scripts in a specific order:
+
+```
+.
+├── 00-add_user.toml
+├── 01-xorg
+│   ├── 00-install.toml
+│   └── 01-config.toml
+└── 02-i3
+    ├── 00-install.toml
+    └── 01-copy_dotfiles.toml
 ```
 
 Example preset TOML:
