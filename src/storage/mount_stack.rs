@@ -49,7 +49,7 @@ impl<'a> MountStack<'a> {
             Some(&source),
             &target,
             None,
-            MsFlags::MS_BIND | MsFlags::MS_NOATIME | MsFlags::MS_RDONLY,
+            MsFlags::MS_BIND | MsFlags::MS_NOATIME, // Read-only flag has no effect for bind mounts
             options,
         )?;
         self.targets.push(target);

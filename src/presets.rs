@@ -73,8 +73,8 @@ impl Preset {
                                 } else {
                                     Err(ErrorKind::Preset(format!(
                                         "Preset: {} - shared directory: {} is not directory",
-                                        path.to_string_lossy(),
-                                        y.to_string_lossy()
+                                        path.display(),
+                                        y.display()
                                     )))
                                 }
                             })

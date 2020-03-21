@@ -138,7 +138,6 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
     let genfstab = Tool::find("genfstab")?;
     let mkfat = Tool::find("mkfs.fat")?;
     let mkext4 = Tool::find("mkfs.ext4")?;
-    let mkdir = Tool::find("mkdir")?;
     let cryptsetup = if command.encrypted_root {
         Some(Tool::find("cryptsetup")?)
     } else {
@@ -269,16 +268,13 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
         if let Some(shared_dirs) = &script.shared_dirs {
             for dir in shared_dirs {
                 // Create shared directories mount points inside chroot
-                mkdir
-                    .execute()
-                    .arg("-p")
-                    .arg(
-                        mount_point
-                            .path()
-                            .join(PathBuf::from("shared_dirs/"))
-                            .join(dir.file_name().unwrap()),
-                    )
-                    .run(ErrorKind::PostInstallation)?;
+                std::fs::create_dir_all(
+                    mount_point
+                        .path()
+                        .join(PathBuf::from("shared_dirs/"))
+                        .join(dir.file_name().unwrap()),
+                )
+                .context(ErrorKind::PresetScript)?;
 
                 // Bind mount shared directories
                 let target = mount_point
