@@ -107,7 +107,7 @@ Presets are used via the `--presets` argument (multiple preset files or director
 sudo ALMA_USER=archie alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0 --presets ./presets/user.toml ./presets/custom_preset.toml
 ```
 
-If a directory is provided, then all files and subdirectories in the directory are recursively crawled in alphanumeric order (all files must be ALMA .toml files). This allows you to use the following structure to compose many scripts in a specific order:
+If a directory is provided, then all files and subdirectories in the directory are recursively crawled in alphanumeric order (only .toml files are parsed as presets). This allows you to use the following structure to compose many scripts in a specific order:
 
 ```
 .
