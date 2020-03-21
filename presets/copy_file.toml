@@ -1,0 +1,5 @@
+script = """
+ls /shared_dirs/copy_file_example/
+cp /shared_dirs/copy_file_example/testfile.txt /root/
+"""
+shared_directories = ["copy_file_example"]

@@ -97,6 +97,7 @@ Preset files are simple TOML files which contain:
 * A list of packages to install: `packages = ["mypackage"]`
 * A post-installation script: `script = """ ... """`
 * Environment variables required by the preset (e.g. used in the script): `enironment_variables = ["USERNAME"]`
+* A list of shared directories `shared_directories = ["subdirectory"]` - where subdirectory would be available at `/shared_dirs/subdirectory/` for use in the script of the preset.
 
 See the presets directory for examples.
 
