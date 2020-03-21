@@ -7,8 +7,10 @@ Storage=volatile
 SystemMaxUse=16M
 ";
 
-pub const BASE_PACKAGES: [&str; 6] = [
+pub const BASE_PACKAGES: [&str; 8] = [
     "base",
+    "linux",
+    "linux-firmware",
     "grub",
     "efibootmgr",
     "intel-ucode",
