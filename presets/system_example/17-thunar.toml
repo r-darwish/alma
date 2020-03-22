@@ -1,0 +1,1 @@
+packages = ["thunar", "thunar-volman", "tumbler", "ffmpegthumbnailer", "polkit", "polkit-gnome"]

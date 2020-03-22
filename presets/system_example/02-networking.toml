@@ -1,0 +1,4 @@
+packages = ["dhcpcd", "networkmanager", "nm-connection-editor", "network-manager-applet"]
+script = """
+systemctl enable NetworkManager.service
+"""

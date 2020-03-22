@@ -1,0 +1,4 @@
+packages = ["lightdm", "lightdm-gtk-greeter"]
+script = """
+systemctl enable lightdm.service
+"""

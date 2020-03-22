@@ -1,0 +1,5 @@
+packages = ["rxvt-unicode"]
+shared_directories = ["urxvt_config"]
+script = """
+cp /shared_dirs/urxvt_config/Xresources /home/${ALMA_USER}/.Xresources
+"""

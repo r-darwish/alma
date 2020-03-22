@@ -11,7 +11,9 @@ systems.
 
 Upgrading your packages is as easy as running `pacman -Syu` (or [Topgrade](https://github.com/r-darwish/topgrade/)) while the system is
 booted. This tool also provides an easy chroot command, so you can keep your live environment up to
-date without having to boot it. Encrypting the root partition is as easy as providing the `-e` flag
+date without having to boot it. Encrypting the root partition is as easy as providing the `-e` flag.
+
+ALMA can also install a specific system configuration according to provided preset files (TOML files specifying packages to install and commands to run). An example of a full system is given in the `presets/system_example/` directory.
 
 ## Installation
 
@@ -98,7 +100,7 @@ Preset files are simple TOML files which contain:
 * A post-installation script: `script = """ ... """`
 * Environment variables required by the preset (e.g. used in the script): `enironment_variables = ["USERNAME"]`
 
-See the presets directory for examples.
+See the presets directory for examples. An example of a set of presets for a fully functional Arch Linux system is available in `presets/system_example/`
 
 Presets are used via the `--presets` argument (multiple preset files or directories may be provided):
 

@@ -1,0 +1,13 @@
+packages = ["vim", "emacs", "nano", "gvim", "wget"]
+script = """
+cd /home/${ALMA_USER}
+sudo -u ${ALMA_USER} wget https://raw.githubusercontent.com/sd65/MiniVim/master/vimrc -O /home/${ALMA_USER}/.vimrc
+sudo -u ${ALMA_USER} sed -i "s/'UseCustomKeyBindings', \\\"1\\\"/'UseCustomKeyBindings', \\\"0\\\"/g" /home/${ALMA_USER}/.vimrc
+
+cd /
+cp /shared_dirs/text_editor_config/gvimrc /home/${ALMA_USER}/.gvimrc
+chown ${ALMA_USER} /home/${ALMA_USER}/.gvimrc
+"""
+shared_directories = ["text_editor_config"]
+environment_variables = ["ALMA_USER"]
+

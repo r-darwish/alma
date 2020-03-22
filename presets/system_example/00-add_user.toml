@@ -1,0 +1,12 @@
+packages = ["sudo", "xdg-user-dirs"]
+script = """
+set -eux
+
+useradd -m ${ALMA_USER}
+echo Enter password for ${ALMA_USER}:
+passwd ${ALMA_USER}
+usermod -G wheel -a ${ALMA_USER}
+sed -i "s/# %wheel ALL=(ALL) NOPASSWD: ALL/%wheel ALL=(ALL) NOPASSWD: ALL/g" /etc/sudoers
+sudo -u ${ALMA_USER} xdg-user-dirs-update
+"""
+environment_variables = ["ALMA_USER"]

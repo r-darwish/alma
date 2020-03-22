@@ -1,0 +1,6 @@
+script = """
+set -eux
+
+echo "Set root password:"
+passwd
+"""

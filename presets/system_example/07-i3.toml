@@ -1,0 +1,11 @@
+packages = ["i3", "dmenu"]
+shared_directories = ["i3_config"]
+script = """
+mkdir -p /home/${ALMA_USER}/.config/i3/
+cp /shared_dirs/i3_config/i3_config /home/${ALMA_USER}/.config/i3/config
+chown ${ALMA_USER} /home/${ALMA_USER}/.config/i3/config
+mkdir -p /home/${ALMA_USER}/.config/i3status/
+cp /shared_dirs/i3_config/i3status_config /home/${ALMA_USER}/.config/i3status/config
+chown ${ALMA_USER} /home/${ALMA_USER}/.config/i3status/config
+"""
+environment_variables = ["ALMA_USER"]

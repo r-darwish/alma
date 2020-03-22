@@ -1,0 +1,4 @@
+script = """
+ln -sf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
+"""
+environment_variables = ["TIMEZONE"]

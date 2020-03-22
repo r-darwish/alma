@@ -1,0 +1,1 @@
+packages = ["pulseaudio-bluetooth", "bluez-utils"]

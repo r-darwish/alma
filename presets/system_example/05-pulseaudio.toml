@@ -1,0 +1,1 @@
+packages = ["pulseaudio", "pulseaudio-alsa", "pavucontrol"]

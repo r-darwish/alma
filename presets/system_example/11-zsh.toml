@@ -1,0 +1,8 @@
+packages = ["zsh", "zsh-completions", "curl", "wget"]
+
+script = """
+cd /home/${ALMA_USER}/
+chsh -s /usr/bin/zsh ${ALMA_USER}
+sudo -u ${ALMA_USER} sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sed 's/exec zsh -l//g')"
+cd /
+"""

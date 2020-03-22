@@ -1,0 +1,2 @@
+packages = ["mesa", "nvidia", "xf86-video-amdgpu", "xf86-video-intel", "nvidia-utils", "xf86-video-ati", "xorg", "noto-fonts", "noto-fonts-extra", "noto-fonts-emoji", "ttf-dejavu"]
+

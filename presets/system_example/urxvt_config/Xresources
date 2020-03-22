@@ -1,0 +1,30 @@
+URxvt.font:     xft:bitstream vera sans mono:size=16:antialias=true
+URxvt.boldFont: xft:bitstream vera sans mono:bold:size=16:antialias=true
+URxvt.foreground: #00FF00
+URxvt.background: #000000
+URxvt*color0:  #000000 // black
+URxvt*color1:  #B40000 // red
+URxvt*color2:  #00AA00 // green
+URxvt*color3:  #AAAA00 // yellow
+URxvt*color4:  #5555AA // blue
+URxvt*color5:  #AA00AA // magenta
+URxvt*color6:  #00AAAA // cyan
+URxvt*color7:  #AAAAAA // white
+URxvt*color8:  #555555 // black (now and below: bright)
+URxvt*color9:  #FF0000 // red
+URxvt*color10: #00FF00 // green
+URxvt*color11: #FFFF00 // yellow
+URxvt*color12: #6464FF // blue
+URxvt*color13: #FF00FF // magenta
+URxvt*color14: #00FFFF // cyan
+URxvt*color15: #FFFFFF // white
+URxvt*scrollBar: false
+URxvt.perl-ext-common: default,matcher,font-size
+URxvt.url-launcher: /usr/bin/xdg-open
+URxvt.matcher.button: 1
+URxvt.matcher.rend.0: Uline Bold fg5
+URxvt.keysym.C-Up:     font-size:increase
+URxvt.keysym.C-Down:   font-size:decrease
+URxvt.keysym.C-equal:  font-size:reset
+URxvt.iso14755: false
+URxvt.iso14755_52: false

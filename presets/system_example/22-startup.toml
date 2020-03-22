@@ -1,0 +1,8 @@
+packages = ["cbatticon"]
+shared_directories = ["startup_config"]
+script = """
+cp /shared_dirs/startup_config/xprofile /home/${ALMA_USER}/.xprofile
+chown ${ALMA_USER} /home/${ALMA_USER}/.xprofile
+"""
+environment_variables = ["ALMA_USER"]
+
