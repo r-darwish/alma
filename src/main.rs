@@ -25,7 +25,7 @@ use std::process::{exit, Command as ProcessCommand};
 use std::thread;
 use std::time::Duration;
 use storage::EncryptedDevice;
-use storage::{BlockDevice, Filesystem, FilesystemType, LoopDevice};
+use storage::{BlockDevice, Filesystem, FilesystemType, LoopDevice, MountStack};
 use structopt::StructOpt;
 use tempfile::tempdir;
 use tool::Tool;
@@ -264,10 +264,33 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
     }
 
     for script in presets.scripts {
+        let mut bind_mount_stack = MountStack::new();
+        if let Some(shared_dirs) = &script.shared_dirs {
+            for dir in shared_dirs {
+                // Create shared directories mount points inside chroot
+                std::fs::create_dir_all(
+                    mount_point
+                        .path()
+                        .join(PathBuf::from("shared_dirs/"))
+                        .join(dir.file_name().unwrap()),
+                )
+                .context(ErrorKind::PresetScript)?;
+
+                // Bind mount shared directories
+                let target = mount_point
+                    .path()
+                    .join(PathBuf::from("shared_dirs/"))
+                    .join(dir.file_name().unwrap());
+                bind_mount_stack
+                    .bind_mount(dir.clone(), target, None)
+                    .context(ErrorKind::Mounting)?;
+            }
+        }
+
         let mut script_file =
             tempfile::NamedTempFile::new_in(mount_point.path()).context(ErrorKind::PresetScript)?;
         script_file
-            .write_all(script.as_bytes())
+            .write_all(script.script_text.as_bytes())
             .and_then(|_| script_file.as_file_mut().metadata())
             .and_then(|metadata| {
                 let mut permissions = metadata.permissions();

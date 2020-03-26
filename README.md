@@ -97,6 +97,7 @@ Preset files are simple TOML files which contain:
 * A list of packages to install: `packages = ["mypackage"]`
 * A post-installation script: `script = """ ... """`
 * Environment variables required by the preset (e.g. used in the script): `enironment_variables = ["USERNAME"]`
+* A list of shared directories `shared_directories = ["subdirectory"]` - where subdirectory would be available at `/shared_dirs/subdirectory/` for use in the script of the preset.
 
 See the presets directory for examples.
 
@@ -105,6 +106,8 @@ Presets are used via the `--presets` argument (multiple preset files or director
 ``` shell
 sudo ALMA_USER=archie alma create /dev/disk/by-id/usb-Generic_USB_Flash_Disk-0:0 --presets ./presets/user.toml ./presets/custom_preset.toml
 ```
+
+Preset scripts are executed in the same order they are provided.
 
 If a directory is provided, then all files and subdirectories in the directory are recursively crawled in alphanumeric order (all files must be ALMA .toml files). This allows you to use the following structure to compose many scripts in a specific order:
 
@@ -132,7 +135,7 @@ usermod -G wheel -a ${ALMA_USER}
 environment_variables = ["ALMA_USER"]
 ```
 
-Preset scripts are executed in the same order they are provided.
+Note that shared directories in the preset scripts are mounted as bind mounts, so they are *not* mounted read-only. Any changes the custom script makes to the shared directory will be carried out in the preset shared directory of the host system, so be sure to copy (not move) files from the shared directories.
 
 ## Similar projects
 

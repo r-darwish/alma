@@ -38,6 +38,24 @@ impl<'a> MountStack<'a> {
         Ok(())
     }
 
+    pub fn bind_mount(
+        &mut self,
+        source: PathBuf,
+        target: PathBuf,
+        options: Option<&str>,
+    ) -> nix::Result<()> {
+        debug!("Mounting {:?} to {:?}", source, target);
+        mount::<_, _, str, _>(
+            Some(&source),
+            &target,
+            None,
+            MsFlags::MS_BIND | MsFlags::MS_NOATIME, // Read-only flag has no effect for bind mounts
+            options,
+        )?;
+        self.targets.push(target);
+        Ok(())
+    }
+
     fn _umount(&mut self) -> Result<(), Error> {
         let mut result = Ok(());
 
