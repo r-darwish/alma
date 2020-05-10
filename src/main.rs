@@ -1,4 +1,5 @@
 mod args;
+mod aur;
 mod constants;
 mod error;
 mod initcpio;
@@ -240,6 +241,10 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
 
     packages.extend(presets.packages);
 
+    if presets.aur_packages.len() > 0 {
+        packages.extend(constants::AUR_DEPENDENCIES.iter().map(|s| String::from(*s)));
+    }
+
     info!("Bootstrapping system");
     pacstrap
         .execute()
@@ -258,7 +263,77 @@ fn create(command: args::CreateCommand) -> Result<(), Error> {
     );
     debug!("fstab:\n{}", fstab);
     fs::write(mount_point.path().join("etc/fstab"), fstab).context(ErrorKind::Fstab)?;
+    if presets.aur_packages.len() > 0 {
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&["useradd", "-m", "aur"])
+            .run(ErrorKind::PostInstallation)?;
 
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&[
+                "sed",
+                "-i",
+                "s/# %wheel ALL=(ALL) NOPASSWD: ALL/aur ALL=(ALL) NOPASSWD: ALL/g",
+            ])
+            .arg("/etc/sudoers")
+            .run(ErrorKind::PostInstallation)?;
+
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&["sudo", "-u", "aur"])
+            .arg("git")
+            .arg("clone")
+            .arg(format!(
+                "https://aur.archlinux.org/{}.git",
+                &command.aur_helper.name
+            ))
+            .arg(format!("/home/aur/{}", &command.aur_helper.name))
+            .run(ErrorKind::PostInstallation)?;
+
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&[
+                "bash",
+                "-c",
+                &format!(
+                    "cd /home/aur/{} && sudo -u aur makepkg -s -i --noconfirm",
+                    &command.aur_helper.name
+                ),
+            ])
+            .run(ErrorKind::PostInstallation)?;
+
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&["sudo", "-u", "aur"])
+            .args(&command.aur_helper.install_command)
+            .args(presets.aur_packages)
+            .args(&command.aur_packages)
+            .run(ErrorKind::PostInstallation)?;
+
+        // Clean up aur user:
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&["userdel", "-r", "aur"])
+            .run(ErrorKind::PostInstallation)?;
+
+        arch_chroot
+            .execute()
+            .arg(mount_point.path())
+            .args(&[
+                "sed",
+                "-i",
+                "s/aur ALL=(ALL) NOPASSWD: ALL/# %wheel ALL=(ALL) NOPASSWD: ALL/g",
+            ])
+            .arg("/etc/sudoers")
+            .run(ErrorKind::PostInstallation)?;
+    }
     if !presets.scripts.is_empty() {
         info!("Running custom scripts");
     }

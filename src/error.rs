@@ -86,6 +86,9 @@ pub enum ErrorKind {
     #[fail(display = "Error executing preset script")]
     PresetScript,
 
+    #[fail(display = "Error parsing AUR helper string")]
+    AurHelper,
+
     #[fail(display = "Error creating the image")]
     Image,
 

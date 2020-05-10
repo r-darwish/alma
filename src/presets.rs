@@ -13,6 +13,7 @@ struct Preset {
     script: Option<String>,
     environment_variables: Option<Vec<String>>,
     shared_directories: Option<Vec<PathBuf>>,
+    aur_packages: Option<Vec<String>>,
 }
 
 fn visit_dirs(dir: &Path, filevec: &mut Vec<PathBuf>) -> Result<(), io::Error> {
@@ -46,9 +47,14 @@ impl Preset {
         scripts: &mut Vec<Script>,
         environment_variables: &mut HashSet<String>,
         path: &PathBuf,
+        aur_packages: &mut HashSet<String>,
     ) -> Result<(), ErrorKind> {
         if let Some(preset_packages) = &self.packages {
             packages.extend(preset_packages.clone());
+        }
+
+        if let Some(preset_aur_packages) = &self.aur_packages {
+            aur_packages.extend(preset_aur_packages.clone());
         }
 
         if let Some(preset_environment_variables) = &self.environment_variables {
@@ -94,12 +100,14 @@ pub struct Script {
 
 pub struct PresetsCollection {
     pub packages: HashSet<String>,
+    pub aur_packages: HashSet<String>,
     pub scripts: Vec<Script>,
 }
 
 impl PresetsCollection {
     pub fn load(list: &[PathBuf]) -> Result<Self, Error> {
         let mut packages = HashSet::new();
+        let mut aur_packages = HashSet::new();
         let mut scripts: Vec<Script> = Vec::new();
         let mut environment_variables = HashSet::new();
 
@@ -121,6 +129,7 @@ impl PresetsCollection {
                         &mut scripts,
                         &mut environment_variables,
                         &path,
+                        &mut aur_packages,
                     )?;
                 }
             } else {
@@ -129,6 +138,7 @@ impl PresetsCollection {
                     &mut scripts,
                     &mut environment_variables,
                     &preset,
+                    &mut aur_packages,
                 )?;
             }
         }
@@ -141,6 +151,10 @@ impl PresetsCollection {
             return Err(ErrorKind::MissingEnvironmentVariables(missing_envrionments).into());
         }
 
-        Ok(Self { packages, scripts })
+        Ok(Self {
+            packages,
+            scripts,
+            aur_packages,
+        })
     }
 }
