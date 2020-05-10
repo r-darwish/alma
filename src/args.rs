@@ -1,3 +1,4 @@
+use super::aur::AurHelper;
 use byte_unit::Byte;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -41,6 +42,10 @@ pub struct CreateCommand {
     #[structopt(short = "p", long = "extra-packages", value_name = "package")]
     pub extra_packages: Vec<String>,
 
+    /// Additional packages to install
+    #[structopt(long = "aur-packages", value_name = "aurpackage")]
+    pub aur_packages: Vec<String>,
+
     /// Enter interactive chroot before unmounting the drive
     #[structopt(short = "i", long = "interactive")]
     pub interactive: bool,
@@ -72,6 +77,9 @@ pub struct CreateCommand {
     /// show non-removable devices
     #[structopt(long = "allow-non-removable")]
     pub allow_non_removable: bool,
+
+    #[structopt(long = "aur-helper", possible_values=&["yay"], default_value="yay")]
+    pub aur_helper: AurHelper,
 }
 
 #[derive(StructOpt)]

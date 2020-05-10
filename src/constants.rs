@@ -17,3 +17,5 @@ pub const BASE_PACKAGES: [&str; 8] = [
     "networkmanager",
     "broadcom-wl",
 ];
+
+pub const AUR_DEPENDENCIES: [&str; 3] = ["base-devel", "git", "sudo"];

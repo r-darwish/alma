@@ -1,0 +1,2 @@
+packages = ["clang"]
+aur_packages = ["bat-cat-git"]
