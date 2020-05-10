@@ -8,8 +8,7 @@ pub struct AurHelper {
 
 impl FromStr for AurHelper {
     type Err = ErrorKind;
-    // Remove make dependencies after install? [y/N]
-    // :: Proceed with installation? [Y/n]
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "yay" => Ok(AurHelper {
