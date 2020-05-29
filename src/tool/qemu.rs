@@ -1,15 +1,14 @@
 use super::Tool;
 use crate::args;
-use crate::error;
+use anyhow::Context;
 use log::debug;
 
-use failure::ResultExt;
 use std::os::unix::process::CommandExt as UnixCommandExt;
 use std::path::PathBuf;
 
 /// Loads given block device in qemu
 /// Uses kvm if it is enabled
-pub fn qemu(command: args::QemuCommand) -> Result<(), error::Error> {
+pub fn qemu(command: args::QemuCommand) -> anyhow::Result<()> {
     let qemu = Tool::find("qemu-system-x86_64")?;
 
     let mut run = qemu.execute();
@@ -39,5 +38,5 @@ pub fn qemu(command: args::QemuCommand) -> Result<(), error::Error> {
 
     let err = run.exec();
 
-    Err(err).context(error::ErrorKind::Qemu)?
+    Err(err).context("Failed launching Qemu")?
 }

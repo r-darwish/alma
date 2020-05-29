@@ -1,9 +1,6 @@
 use super::markers::BlockDevice;
-use crate::{
-    error::{Error, ErrorKind},
-    process::CommandExt,
-    tool::Tool,
-};
+use crate::{process::CommandExt, tool::Tool};
+use anyhow::Context;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FilesystemType {
@@ -31,14 +28,14 @@ impl<'a> Filesystem<'a> {
         block: &'a dyn BlockDevice,
         fs_type: FilesystemType,
         mkfs: &Tool,
-    ) -> Result<Self, Error> {
+    ) -> anyhow::Result<Self> {
         let mut command = mkfs.execute();
         match fs_type {
             FilesystemType::Ext4 => command.arg("-F").arg(block.path()),
             FilesystemType::Vfat => command.arg("-F32").arg(block.path()),
         };
 
-        command.run(ErrorKind::Formatting)?;
+        command.run().context("Error formatting filesystem")?;
 
         Ok(Self { fs_type, block })
     }

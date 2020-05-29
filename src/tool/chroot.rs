@@ -2,19 +2,18 @@ use super::mount;
 use super::Tool;
 use crate::args;
 use crate::constants::{BOOT_PARTITION_INDEX, ROOT_PARTITION_INDEX};
-use crate::error::{Error, ErrorKind};
 use crate::process::CommandExt;
 use crate::storage;
 use crate::storage::{is_encrypted_device, EncryptedDevice};
 use crate::storage::{BlockDevice, Filesystem, FilesystemType, LoopDevice};
+use anyhow::Context;
 use log::info;
 
-use failure::ResultExt;
 use tempfile::tempdir;
 
 /// Use arch-chroot to chroot to the given device
 /// Also handles encrypted root partitions (detected by checking for the LUKS magic header)
-pub fn chroot(command: args::ChrootCommand) -> Result<(), Error> {
+pub fn chroot(command: args::ChrootCommand) -> anyhow::Result<()> {
     let arch_chroot = Tool::find("arch-chroot")?;
     let cryptsetup;
 
@@ -26,12 +25,12 @@ pub fn chroot(command: args::ChrootCommand) -> Result<(), Error> {
             Err(_) => {
                 loop_device = Some(LoopDevice::create(&command.block_device)?);
                 storage::StorageDevice::from_path(
-                    loop_device.as_ref().unwrap().path(),
+                    loop_device.as_ref().expect("loop device not found").path(),
                     command.allow_non_removable,
                 )?
             }
         };
-    let mount_point = tempdir().context(ErrorKind::TmpDirError)?;
+    let mount_point = tempdir().context("Error creating a temporary directory")?;
 
     let boot_partition = storage_device.get_partition(BOOT_PARTITION_INDEX)?;
     let boot_filesystem = Filesystem::from_partition(&boot_partition, FilesystemType::Vfat);
@@ -40,7 +39,7 @@ pub fn chroot(command: args::ChrootCommand) -> Result<(), Error> {
     let encrypted_root = if is_encrypted_device(&root_partition_base)? {
         cryptsetup = Some(Tool::find("cryptsetup")?);
         Some(EncryptedDevice::open(
-            cryptsetup.as_ref().unwrap(),
+            cryptsetup.as_ref().expect("cryptsetup not found"),
             &root_partition_base,
             "alma_root".into(),
         )?)
@@ -61,7 +60,13 @@ pub fn chroot(command: args::ChrootCommand) -> Result<(), Error> {
         .execute()
         .arg(mount_point.path())
         .args(&command.command)
-        .run(ErrorKind::Interactive)?;
+        .run()
+        .with_context(|| {
+            format!(
+                "Error running command in chroot: {}",
+                command.command.join(" "),
+            )
+        })?;
 
     info!("Unmounting filesystems");
     mount_stack.umount()?;

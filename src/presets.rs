@@ -1,5 +1,4 @@
-use crate::error::{Error, ErrorKind};
-use failure::ResultExt;
+use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::env;
@@ -34,11 +33,9 @@ fn visit_dirs(dir: &Path, filevec: &mut Vec<PathBuf>) -> Result<(), io::Error> {
 }
 
 impl Preset {
-    fn load(path: &Path) -> Result<Self, Error> {
-        let data = fs::read_to_string(path)
-            .with_context(|_| ErrorKind::Preset(format!("{}", path.display())))?;
-        Ok(toml::from_str(&data)
-            .with_context(|_| ErrorKind::Preset(format!("{}", path.display())))?)
+    fn load(path: &Path) -> anyhow::Result<Self> {
+        let data = fs::read_to_string(path).with_context(|| format!("{}", path.display()))?;
+        Ok(toml::from_str(&data).with_context(|| format!("{}", path.display()))?)
     }
 
     fn process(
@@ -48,7 +45,7 @@ impl Preset {
         environment_variables: &mut HashSet<String>,
         path: &PathBuf,
         aur_packages: &mut HashSet<String>,
-    ) -> Result<(), ErrorKind> {
+    ) -> anyhow::Result<()> {
         if let Some(preset_packages) = &self.packages {
             packages.extend(preset_packages.clone());
         }
@@ -73,18 +70,18 @@ impl Preset {
                         x.iter()
                             .cloned()
                             .map(|y| {
-                                let full_path = path.parent().unwrap().join(&y);
+                                let full_path = path.parent().expect("Path has no parent").join(&y);
                                 if full_path.is_dir() {
                                     Ok(full_path)
                                 } else {
-                                    Err(ErrorKind::Preset(format!(
+                                    Err(anyhow!(
                                         "Preset: {} - shared directory: {} is not directory",
                                         path.display(),
                                         y.display()
-                                    )))
+                                    ))
                                 }
                             })
-                            .collect::<Result<Vec<_>, ErrorKind>>()
+                            .collect::<anyhow::Result<Vec<_>>>()
                     })
                     .map_or(Ok(None), |r| r.map(Some))?,
             });
@@ -105,7 +102,7 @@ pub struct PresetsCollection {
 }
 
 impl PresetsCollection {
-    pub fn load(list: &[PathBuf]) -> Result<Self, Error> {
+    pub fn load(list: &[PathBuf]) -> anyhow::Result<Self> {
         let mut packages = HashSet::new();
         let mut aur_packages = HashSet::new();
         let mut scripts: Vec<Script> = Vec::new();
@@ -117,7 +114,7 @@ impl PresetsCollection {
                 // Recursively load directories of preset files
                 let mut dir_paths: Vec<PathBuf> = Vec::new();
                 visit_dirs(&preset, &mut dir_paths)
-                    .with_context(|_| ErrorKind::Preset(format!("{}", preset.display())))?;
+                    .with_context(|| format!("{}", preset.display()))?;
 
                 // Order not guaranteed so we sort
                 // In the future may want to support numerical sort i.e. 15_... < 100_...
@@ -148,7 +145,10 @@ impl PresetsCollection {
             .collect();
 
         if !missing_envrionments.is_empty() {
-            return Err(ErrorKind::MissingEnvironmentVariables(missing_envrionments).into());
+            return Err(anyhow!(
+                "Missing environment variables {:?}",
+                missing_envrionments
+            ));
         }
 
         Ok(Self {

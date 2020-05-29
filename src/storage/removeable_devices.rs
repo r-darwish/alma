@@ -1,6 +1,5 @@
-use crate::error::{Error, ErrorKind};
+use anyhow::Context;
 use byte_unit::Byte;
-use failure::ResultExt;
 use std::{fmt, fs};
 
 #[derive(Debug)]
@@ -27,16 +26,16 @@ fn trimmed(source: String) -> String {
     String::from(source.trim_end())
 }
 
-pub fn get_storage_devices(allow_non_removable: bool) -> Result<Vec<Device>, Error> {
+pub fn get_storage_devices(allow_non_removable: bool) -> anyhow::Result<Vec<Device>> {
     let mut result = Vec::new();
 
-    for entry in fs::read_dir("/sys/block").context(ErrorKind::StorageDevicesQuery)? {
-        let entry = entry.context(ErrorKind::StorageDevicesQuery)?;
+    for entry in fs::read_dir("/sys/block").context("Error querying storage devices")? {
+        let entry = entry.context("Error querying storage devices")?;
 
         let removable = allow_non_removable
             || fs::read_to_string(entry.path().join("removable"))
                 .map(|v| v == "1\n")
-                .context(ErrorKind::StorageDevicesQuery)?;
+                .context("Error querying storage devices")?;
 
         if !removable {
             continue;
@@ -44,7 +43,7 @@ pub fn get_storage_devices(allow_non_removable: bool) -> Result<Vec<Device>, Err
 
         let model = fs::read_to_string(entry.path().join("device/model"))
             .map(trimmed)
-            .context(ErrorKind::StorageDevicesQuery)?;
+            .context("Error querying storage devices")?;
 
         if model == "CD-ROM" {
             continue;
@@ -54,19 +53,19 @@ pub fn get_storage_devices(allow_non_removable: bool) -> Result<Vec<Device>, Err
             name: entry
                 .path()
                 .file_name()
-                .unwrap()
+                .expect("Could not get file name for dir entry /sys/block")
                 .to_string_lossy()
                 .into_owned(),
             model,
             vendor: fs::read_to_string(entry.path().join("device/vendor"))
                 .map(trimmed)
-                .context(ErrorKind::StorageDevicesQuery)?,
+                .context("Error querying storage devices")?,
             size: Byte::from_bytes(
                 fs::read_to_string(entry.path().join("size"))
-                    .context(ErrorKind::StorageDevicesQuery)?
+                    .context("Error querying storage devices")?
                     .trim()
                     .parse::<u128>()
-                    .unwrap()
+                    .context("Could not parse block size to unsigned integer (u128)")?
                     * 512,
             ),
         })
@@ -81,7 +80,7 @@ mod tests {
 
     #[test]
     fn sanity() {
-        let devices = get_storage_devices(false).unwrap();
+        let devices = get_storage_devices(false).expect("No devices");
         println!("{:?}", devices);
     }
 }

@@ -9,7 +9,7 @@ impl Initcpio {
         Self { encrypted }
     }
 
-    pub fn to_config(&self) -> String {
+    pub fn to_config(&self) -> anyhow::Result<String> {
         let mut output = String::from(
             "MODULES=()
 BINARIES=()
@@ -18,11 +18,11 @@ HOOKS=(base udev keyboard consolefont block ",
         );
 
         if self.encrypted {
-            output.write_str("encrypt ").unwrap();
+            output.write_str("encrypt ")?;
         }
 
-        output.write_str("filesystems keyboard fsck)\n").unwrap();
+        output.write_str("filesystems keyboard fsck)\n")?;
 
-        output
+        Ok(output)
     }
 }

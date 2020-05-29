@@ -1,4 +1,4 @@
-use crate::error::ErrorKind;
+use anyhow::anyhow;
 use std::str::FromStr;
 
 pub struct AurHelper {
@@ -7,9 +7,9 @@ pub struct AurHelper {
 }
 
 impl FromStr for AurHelper {
-    type Err = ErrorKind;
+    type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> anyhow::Result<Self> {
         match s {
             "yay" => Ok(AurHelper {
                 name: String::from("yay"),
@@ -32,7 +32,7 @@ impl FromStr for AurHelper {
                     String::from("--noconfirm"),
                 ],
             }),
-            _ => Err(ErrorKind::AurHelper {}),
+            _ => Err(anyhow!("Error parsing AUR helper string: {}", s)),
         }
     }
 }
