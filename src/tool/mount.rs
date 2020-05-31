@@ -1,6 +1,5 @@
-use crate::error::{Error, ErrorKind};
 use crate::storage::{Filesystem, MountStack};
-use failure::ResultExt;
+use anyhow::Context;
 use log::{debug, info};
 use std::fs;
 use std::path::Path;
@@ -12,7 +11,7 @@ pub fn mount<'a>(
     mount_path: &Path,
     boot_filesystem: &'a Filesystem,
     root_filesystem: &'a Filesystem,
-) -> Result<MountStack<'a>, Error> {
+) -> anyhow::Result<MountStack<'a>> {
     let mut mount_stack = MountStack::new();
     debug!(
         "Root partition: {}",
@@ -22,16 +21,16 @@ pub fn mount<'a>(
     info!("Mounting filesystems to {}", mount_path.display());
     mount_stack
         .mount(&root_filesystem, mount_path.into(), None)
-        .context(ErrorKind::Mounting)?;
+        .with_context(|| format!("Error mounting filesystem to {}", mount_path.display()))?;
 
     let boot_point = mount_path.join("boot");
     if !boot_point.exists() {
-        fs::create_dir(&boot_point).context(ErrorKind::CreateBoot)?;
+        fs::create_dir(&boot_point).context("Error creating the boot directory")?;
     }
 
     mount_stack
         .mount(&boot_filesystem, boot_point, None)
-        .context(ErrorKind::Mounting)?;
+        .context("Error mounting the boot point")?;
 
     Ok(mount_stack)
 }

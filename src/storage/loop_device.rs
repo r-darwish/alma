@@ -1,6 +1,5 @@
-use crate::error::{Error, ErrorKind};
 use crate::tool::Tool;
-use failure::ResultExt;
+use anyhow::{anyhow, Context};
 use log::info;
 use std::path::{Path, PathBuf};
 
@@ -11,20 +10,24 @@ pub struct LoopDevice {
 }
 
 impl LoopDevice {
-    pub fn create(file: &Path) -> Result<Self, Error> {
+    pub fn create(file: &Path) -> anyhow::Result<Self> {
         let losetup = Tool::find("losetup")?;
         let output = losetup
             .execute()
             .args(&["--find", "-P", "--show"])
             .arg(file)
             .output()
-            .context(ErrorKind::Image)?;
+            .context("Error creating the image")?;
 
         if !output.status.success() {
-            return Err(ErrorKind::Losetup(String::from_utf8(output.stderr).unwrap()).into());
+            return Err(anyhow!(String::from_utf8(output.stderr)?));
         }
 
-        let path = PathBuf::from(String::from_utf8(output.stdout).unwrap().trim());
+        let path = PathBuf::from(
+            String::from_utf8(output.stdout)
+                .context("Output not valid UTF-8")?
+                .trim(),
+        );
         info!("Mounted {} to {}", file.display(), path.display());
 
         Ok(LoopDevice { path, losetup })
@@ -43,7 +46,7 @@ impl Drop for LoopDevice {
             .arg("-d")
             .arg(&self.path)
             .spawn()
-            .unwrap()
+            .expect("Failed to spawn command to detach loop device")
             .wait()
             .ok();
     }

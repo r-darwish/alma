@@ -1,7 +1,6 @@
 use super::markers::{BlockDevice, Origin};
 use super::partition::Partition;
-use crate::error::{Error, ErrorKind};
-use failure::ResultExt;
+use anyhow::{anyhow, Context};
 use log::debug;
 use std::fs::read_to_string;
 use std::marker::PhantomData;
@@ -15,14 +14,16 @@ pub struct StorageDevice<'a> {
 }
 
 impl<'a> StorageDevice<'a> {
-    pub fn from_path(path: &'a Path, allow_non_removable: bool) -> Result<Self, Error> {
+    pub fn from_path(path: &'a Path, allow_non_removable: bool) -> anyhow::Result<Self> {
         debug!("path: {:?}", path);
-        let path = path.canonicalize().context(ErrorKind::DeviceQuery)?;
+        let path = path
+            .canonicalize()
+            .context("Error querying information about the block device")?;
         let device_name = path
             .file_name()
             .and_then(|s| s.to_str())
             .map(String::from)
-            .ok_or_else(|| Error::from(ErrorKind::InvalidDeviceName))?;
+            .ok_or_else(|| anyhow!("Invalid device name: {}", path.display()))?;
 
         debug!("real path: {:?}, device name: {:?}", path, device_name);
 
@@ -35,7 +36,10 @@ impl<'a> StorageDevice<'a> {
         // If we only allow removable/loop devices, and the device is neither removable or a loop
         // device then throw a DangerousDevice error
         if !(allow_non_removable || _self.is_removable_device()? || _self.is_loop_device()) {
-            return Err(ErrorKind::DangerousDevice.into());
+            return Err(anyhow!(
+                "The given block device is neither removable nor a loop device: {}",
+                _self.name
+            ));
         }
 
         Ok(_self)
@@ -47,12 +51,13 @@ impl<'a> StorageDevice<'a> {
         path
     }
 
-    fn is_removable_device(&self) -> Result<bool, Error> {
+    fn is_removable_device(&self) -> anyhow::Result<bool> {
         let mut path = self.sys_path();
         path.push("removable");
 
         debug!("Reading: {:?}", path);
-        let result = read_to_string(&path).context(ErrorKind::DeviceQuery)?;
+        let result =
+            read_to_string(&path).context("Error querying information about the block device")?;
         debug!("{:?} -> {}", path, result);
 
         Ok(result == "1\n")
@@ -64,8 +69,15 @@ impl<'a> StorageDevice<'a> {
         path.exists()
     }
 
-    pub fn get_partition(&self, index: u8) -> Result<Partition, Error> {
-        let name = if self.name.chars().rev().next().unwrap().is_digit(10) {
+    pub fn get_partition(&self, index: u8) -> anyhow::Result<Partition> {
+        let name = if self
+            .name
+            .chars()
+            .rev()
+            .next()
+            .expect("Storage device name is empty")
+            .is_digit(10)
+        {
             format!("{}p{}", self.name, index)
         } else {
             format!("{}{}", self.name, index)
@@ -75,7 +87,7 @@ impl<'a> StorageDevice<'a> {
 
         debug!("Partition {} for {} is in {:?}", index, self.name, path);
         if !path.exists() {
-            return Err(ErrorKind::NoSuchPartition(index).into());
+            return Err(anyhow!("Partition {} does not exist", index));
         }
         Ok(Partition::new::<Self>(path))
     }
