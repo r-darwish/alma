@@ -7,7 +7,7 @@ Storage=volatile
 SystemMaxUse=16M
 ";
 
-pub const BASE_PACKAGES: [&str; 8] = [
+pub const BASE_PACKAGES: [&str; 9] = [
     "base",
     "linux",
     "linux-firmware",
@@ -16,6 +16,7 @@ pub const BASE_PACKAGES: [&str; 8] = [
     "intel-ucode",
     "networkmanager",
     "broadcom-wl",
+    "amd-ucode",
 ];
 
 pub const AUR_DEPENDENCIES: [&str; 3] = ["base-devel", "git", "sudo"];
