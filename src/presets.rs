@@ -22,10 +22,8 @@ fn visit_dirs(dir: &Path, filevec: &mut Vec<PathBuf>) -> Result<(), io::Error> {
             let path = entry.path();
             if path.is_dir() {
                 visit_dirs(&path, filevec)?;
-            } else {
-                if entry.path().extension() == Some(&std::ffi::OsString::from("toml")) {
-                    filevec.push(entry.path());
-                }
+            } else if entry.path().extension() == Some(&std::ffi::OsString::from("toml")) {
+                filevec.push(entry.path());
             }
         }
     }

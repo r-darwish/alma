@@ -225,7 +225,7 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
 
     packages.extend(presets.packages);
 
-    if presets.aur_packages.len() > 0 {
+    if !presets.aur_packages.is_empty() {
         packages.extend(constants::AUR_DEPENDENCIES.iter().map(|s| String::from(*s)));
     }
 
@@ -249,7 +249,7 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
     );
     debug!("fstab:\n{}", fstab);
     fs::write(mount_point.path().join("etc/fstab"), fstab).context("fstab error")?;
-    if presets.aur_packages.len() > 0 {
+    if !presets.aur_packages.is_empty() {
         arch_chroot
             .execute()
             .arg(mount_point.path())
