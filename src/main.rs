@@ -249,6 +249,14 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
     );
     debug!("fstab:\n{}", fstab);
     fs::write(mount_point.path().join("etc/fstab"), fstab).context("fstab error")?;
+
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .args(&["passwd", "-d", "root"])
+        .run()
+        .context("Failed to delete the root password")?;
+
     if !presets.aur_packages.is_empty() {
         arch_chroot
             .execute()
