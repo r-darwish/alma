@@ -387,7 +387,7 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
                 ),
             )
             .run()
-            .context("Failed running preset script")?;
+            .with_context(|| format!("Failed running preset script:\n{}", script.script_text))?;
     }
 
     info!("Performing post installation tasks");

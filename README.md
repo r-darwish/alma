@@ -137,6 +137,38 @@ environment_variables = ["ALMA_USER"]
 
 Note that shared directories in the preset scripts are mounted as bind mounts, so they are *not* mounted read-only. Any changes the custom script makes to the shared directory will be carried out in the preset shared directory of the host system, so be sure to copy (not move) files from the shared directories.
 
+### Order of execution
+
+ALMA installs the packages and presets in the following order:
+
+1. All non-AUR packages are installed
+2. If AUR packages are present in the toml files, yay (or another
+   specified AUR helper) is installed
+3. All AUR packages are installed.
+4. Preset scripts are executed according to their filenames in
+   alphanumeric order.
+
+Note this may mean you have to workaround some package installations if
+they depend on preset scripts.
+
+For example, at the moment you cannot install Rust-based AUR packages in
+the `aur_packages` array of the Preset TOMLs if you use rustup,
+since rustup needs to be given the toolchain to
+install first. This can be worked around by carrying out the AUR
+package installation inside the preset script itself in these cases.
+
+## Troubleshooting
+### mkinitcpio: /etc/mkinitcpio.d/linux.preset: No such file or directory
+
+Ensure you have both the `linux` and `base` packages installed. Note
+that only Arch Linux is supported, not Arch Linux derivatives such as
+Manjaro.
+
+### Problem opening /dev/... for reading! Error is 123.
+
+Delete all partitions on the disk first (e.g. with gparted) and try
+again.
+
 ## Similar projects
 
 * [NomadBSD](http://nomadbsd.org/)
