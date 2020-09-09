@@ -257,6 +257,25 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
         .run()
         .context("Failed to delete the root password")?;
 
+    info!("Setting locale");
+    fs::OpenOptions::new()
+        .append(true)
+        .write(true)
+        .open(mount_point.path().join("etc/locale.gen"))
+        .and_then(|mut locale_gen| locale_gen.write_all(b"en_US.UTF-8 UTF-8\n"))
+        .context("Failed to create locale.gen")?;
+    fs::write(
+        mount_point.path().join("etc/locale.conf"),
+        "LANG=en_US.UTF-8",
+    )
+    .context("Failed to write to locale.conf")?;
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .arg("locale-gen")
+        .run()
+        .context("locale-gen failed")?;
+
     if !presets.aur_packages.is_empty() {
         arch_chroot
             .execute()
@@ -405,25 +424,6 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
         constants::JOURNALD_CONF,
     )
     .context("Failed to write to journald.conf")?;
-
-    info!("Setting locale");
-    fs::OpenOptions::new()
-        .append(true)
-        .write(true)
-        .open(mount_point.path().join("etc/locale.gen"))
-        .and_then(|mut locale_gen| locale_gen.write_all(b"en_US.UTF-8 UTF-8\n"))
-        .context("Failed to create locale.gen")?;
-    fs::write(
-        mount_point.path().join("etc/locale.conf"),
-        "LANG=en_US.UTF-8",
-    )
-    .context("Failed to write to locale.conf")?;
-    arch_chroot
-        .execute()
-        .arg(mount_point.path())
-        .arg("locale-gen")
-        .run()
-        .context("locale-gen failed")?;
 
     info!("Generating initramfs");
     fs::write(
