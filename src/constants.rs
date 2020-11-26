@@ -20,4 +20,4 @@ pub const BASE_PACKAGES: [&str; 9] = [
 ];
 
 // we add go so that it is cached when installing yay
-pub const AUR_DEPENDENCIES: [&str; 4] = ["base-devel", "git", "sudo", "go"];
+pub const AUR_DEPENDENCIES: [&str; 3] = ["base-devel", "git", "sudo"];

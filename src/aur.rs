@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 pub struct AurHelper {
     pub name: String,
+    pub package_name: String,
     pub install_command: Vec<String>,
 }
 
@@ -13,6 +14,7 @@ impl FromStr for AurHelper {
         match s {
             "yay" => Ok(AurHelper {
                 name: String::from("yay"),
+                package_name: String::from("yay-bin"),
                 install_command: vec![
                     String::from("yay"),
                     String::from("-S"),

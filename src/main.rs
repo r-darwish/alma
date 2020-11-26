@@ -225,7 +225,8 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
 
     packages.extend(presets.packages);
 
-    if !presets.aur_packages.is_empty() {
+    let use_aur = !(presets.aur_packages.is_empty() && command.aur_packages.is_empty());
+    if use_aur {
         packages.extend(constants::AUR_DEPENDENCIES.iter().map(|s| String::from(*s)));
     }
 
@@ -276,7 +277,9 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
         .run()
         .context("locale-gen failed")?;
 
-    if !presets.aur_packages.is_empty() {
+    if use_aur {
+        info!("Installing AUR packages");
+
         arch_chroot
             .execute()
             .arg(mount_point.path())
@@ -284,16 +287,8 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
             .run()
             .context("Failed to create temporary user to install AUR packages")?;
 
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&[
-                "sed",
-                "-i",
-                "s/# %wheel ALL=(ALL) NOPASSWD: ALL/aur ALL=(ALL) NOPASSWD: ALL/g",
-            ])
-            .arg("/etc/sudoers")
-            .run()
+        let aur_sudoers = mount_point.path().join("etc/sudoers.d/aur");
+        fs::write(&aur_sudoers, "aur ALL=(ALL) NOPASSWD: ALL")
             .context("Failed to modify sudoers file for AUR packages")?;
 
         arch_chroot
@@ -304,7 +299,7 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
             .arg("clone")
             .arg(format!(
                 "https://aur.archlinux.org/{}.git",
-                &command.aur_helper.name
+                &command.aur_helper.package_name
             ))
             .arg(format!("/home/aur/{}", &command.aur_helper.name))
             .run()
@@ -342,17 +337,7 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
             .run()
             .context("Failed to delete temporary aur user")?;
 
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&[
-                "sed",
-                "-i",
-                "s/aur ALL=(ALL) NOPASSWD: ALL/# %wheel ALL=(ALL) NOPASSWD: ALL/g",
-            ])
-            .arg("/etc/sudoers")
-            .run()
-            .context("Failed to undo sudoers changes")?;
+        fs::remove_file(&aur_sudoers).context("Cannot delete the AUR sudoers temporary file")?;
     }
     if !presets.scripts.is_empty() {
         info!("Running custom scripts");
