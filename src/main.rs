@@ -225,10 +225,14 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
 
     packages.extend(presets.packages);
 
-    let use_aur = !(presets.aur_packages.is_empty() && command.aur_packages.is_empty());
-    if use_aur {
-        packages.extend(constants::AUR_DEPENDENCIES.iter().map(|s| String::from(*s)));
-    }
+    let aur_pacakges = {
+        let mut p = vec![String::from("shim-signed")];
+        p.extend(presets.aur_packages);
+        p.extend(command.aur_packages);
+        p
+    };
+
+    packages.extend(constants::AUR_DEPENDENCIES.iter().map(|s| String::from(*s)));
 
     info!("Bootstrapping system");
     pacstrap
@@ -277,68 +281,66 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
         .run()
         .context("locale-gen failed")?;
 
-    if use_aur {
-        info!("Installing AUR packages");
+    info!("Installing AUR packages");
 
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&["useradd", "-m", "aur"])
-            .run()
-            .context("Failed to create temporary user to install AUR packages")?;
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .args(&["useradd", "-m", "aur"])
+        .run()
+        .context("Failed to create temporary user to install AUR packages")?;
 
-        let aur_sudoers = mount_point.path().join("etc/sudoers.d/aur");
-        fs::write(&aur_sudoers, "aur ALL=(ALL) NOPASSWD: ALL")
-            .context("Failed to modify sudoers file for AUR packages")?;
+    let aur_sudoers = mount_point.path().join("etc/sudoers.d/aur");
+    fs::write(&aur_sudoers, "aur ALL=(ALL) NOPASSWD: ALL")
+        .context("Failed to modify sudoers file for AUR packages")?;
 
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&["sudo", "-u", "aur"])
-            .arg("git")
-            .arg("clone")
-            .arg(format!(
-                "https://aur.archlinux.org/{}.git",
-                &command.aur_helper.package_name
-            ))
-            .arg(format!("/home/aur/{}", &command.aur_helper.name))
-            .run()
-            .context("Failed to clone AUR helper package")?;
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .args(&["sudo", "-u", "aur"])
+        .arg("git")
+        .arg("clone")
+        .arg(format!(
+            "https://aur.archlinux.org/{}.git",
+            &command.aur_helper.package_name
+        ))
+        .arg(format!("/home/aur/{}", &command.aur_helper.name))
+        .run()
+        .context("Failed to clone AUR helper package")?;
 
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&[
-                "bash",
-                "-c",
-                &format!(
-                    "cd /home/aur/{} && sudo -u aur makepkg -s -i --noconfirm",
-                    &command.aur_helper.name
-                ),
-            ])
-            .run()
-            .context("Failed to build AUR helper")?;
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .args(&[
+            "bash",
+            "-c",
+            &format!(
+                "cd /home/aur/{} && sudo -u aur makepkg -s -i --noconfirm",
+                &command.aur_helper.name
+            ),
+        ])
+        .run()
+        .context("Failed to build AUR helper")?;
 
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&["sudo", "-u", "aur"])
-            .args(&command.aur_helper.install_command)
-            .args(presets.aur_packages)
-            .args(&command.aur_packages)
-            .run()
-            .context("Failed to install AUR packages")?;
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .args(&["sudo", "-u", "aur"])
+        .args(&command.aur_helper.install_command)
+        .args(aur_pacakges)
+        .run()
+        .context("Failed to install AUR packages")?;
 
-        // Clean up aur user:
-        arch_chroot
-            .execute()
-            .arg(mount_point.path())
-            .args(&["userdel", "-r", "aur"])
-            .run()
-            .context("Failed to delete temporary aur user")?;
+    // Clean up aur user:
+    arch_chroot
+        .execute()
+        .arg(mount_point.path())
+        .args(&["userdel", "-r", "aur"])
+        .run()
+        .context("Failed to delete temporary aur user")?;
 
-        fs::remove_file(&aur_sudoers).context("Cannot delete the AUR sudoers temporary file")?;
-    }
+    fs::remove_file(&aur_sudoers).context("Cannot delete the AUR sudoers temporary file")?;
+
     if !presets.scripts.is_empty() {
         info!("Running custom scripts");
     }
@@ -456,6 +458,23 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
         .args(&["bash", "-c"])
         .arg(format!("grub-install --target=i386-pc --boot-directory /boot {} && grub-install --target=x86_64-efi --efi-directory /boot --boot-directory /boot --removable &&  grub-mkconfig -o /boot/grub/grub.cfg", disk_path.display()))
         .run().context("Failed to install grub")?;
+
+    let bootloader = mount_point.path().join("boot/EFI/BOOT/BOOTX64.efi");
+    fs::rename(
+        &bootloader,
+        mount_point.path().join("boot/EFI/BOOT/grubx64.efi"),
+    )
+    .context("Cannot move out grub")?;
+    fs::copy(
+        mount_point.path().join("usr/share/shim-signed/mmx64.efi"),
+        mount_point.path().join("boot/EFI/BOOT/mmx64.efi"),
+    )
+    .context("Failed copying mmx64")?;
+    fs::copy(
+        mount_point.path().join("usr/share/shim-signed/shimx64.efi"),
+        bootloader,
+    )
+    .context("Failed copying shim")?;
 
     debug!(
         "GRUB configuration: {}",
