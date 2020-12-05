@@ -17,6 +17,11 @@ date without having to boot it. Encrypting the root partition is as easy as prov
 
 You can either build the project using cargo build or install the `alma` package from AUR.
 
+### Using Arch Linux derivatives
+
+Using Arch Linux derivatives, such as Manjaro, isn't supported it ALMA. It may work and may not. Please do not open bugs or feature 
+requests if you are not using the official Arch Linux.
+
 ## Usage
 
 ### Image creation on removable device
