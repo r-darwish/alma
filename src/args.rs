@@ -38,6 +38,12 @@ pub struct CreateCommand {
     #[structopt(parse(from_os_str))]
     pub path: Option<PathBuf>,
 
+    /// Path to a pacman.conf file which will be used to pacstrap packages into the image.
+    ///
+    /// This pacman.conf will also be copied into the resulting Arch Linux image.
+    #[structopt(short = "c", long = "pacman-conf", value_name = "pacman_conf")]
+    pub pacman_conf: Option<PathBuf>,
+
     /// Additional packages to install
     #[structopt(short = "p", long = "extra-packages", value_name = "package")]
     pub extra_packages: Vec<String>,

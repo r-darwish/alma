@@ -234,15 +234,25 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
 
     packages.extend(constants::AUR_DEPENDENCIES.iter().map(|s| String::from(*s)));
 
+    let pacman_conf_path = command
+        .pacman_conf
+        .unwrap_or_else(|| "/etc/pacman.conf".into());
+
     info!("Bootstrapping system");
     pacstrap
         .execute()
+        .arg("-C")
+        .arg(&pacman_conf_path)
         .arg("-c")
         .arg(mount_point.path())
         .args(packages)
         .args(&command.extra_packages)
         .run()
         .context("Pacstrap error")?;
+
+    // Copy pacman.conf to the image.
+    fs::copy(pacman_conf_path, mount_point.path().join("etc/pacman.conf"))
+        .context("Failed copying pacman.conf")?;
 
     let fstab = fix_fstab(
         &genfstab
