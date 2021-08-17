@@ -84,7 +84,7 @@ pub struct CreateCommand {
     #[structopt(long = "allow-non-removable")]
     pub allow_non_removable: bool,
 
-    #[structopt(long = "aur-helper", possible_values=&["yay"], default_value="yay")]
+    #[structopt(long = "aur-helper", possible_values=&["paru", "yay"], default_value="yay")]
     pub aur_helper: AurHelper,
 }
 
