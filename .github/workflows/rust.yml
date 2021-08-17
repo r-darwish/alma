@@ -2,37 +2,30 @@ name: Rust
 
 on:
   push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
-
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
           components: rustfmt, clippy
-      - uses: actions-rs/cargo@v1.0.1
+      - uses: actions-rs/cargo@v1
         name: Check format
         with:
           command: fmt
           args: --all -- --check
-      - uses: actions-rs/cargo@v1.0.1
+      - uses: actions-rs/cargo@v1
         name: Run clippy
         with:
           command: clippy
           args: --all-targets --locked -- -D warnings
-      - uses: actions-rs/cargo@v1.0.1
+      - uses: actions-rs/cargo@v1
         name: Run tests
         with:
           command: test
