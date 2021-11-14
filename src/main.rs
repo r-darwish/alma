@@ -186,7 +186,7 @@ fn create(command: args::CreateCommand) -> anyhow::Result<()> {
     let root_partition_base = storage_device.get_partition(constants::ROOT_PARTITION_INDEX)?;
     let encrypted_root = if let Some(cryptsetup) = &cryptsetup {
         info!("Encrypting the root filesystem");
-        EncryptedDevice::prepare(&cryptsetup, &root_partition_base)?;
+        EncryptedDevice::prepare(cryptsetup, &root_partition_base)?;
         Some(EncryptedDevice::open(
             cryptsetup,
             &root_partition_base,

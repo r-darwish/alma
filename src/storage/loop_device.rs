@@ -30,7 +30,7 @@ impl LoopDevice {
         );
         info!("Mounted {} to {}", file.display(), path.display());
 
-        Ok(LoopDevice { path, losetup })
+        Ok(Self { path, losetup })
     }
 
     pub fn path(&self) -> &Path {

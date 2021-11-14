@@ -20,7 +20,7 @@ pub fn mount<'a>(
 
     info!("Mounting filesystems to {}", mount_path.display());
     mount_stack
-        .mount(&root_filesystem, mount_path.into(), None)
+        .mount(root_filesystem, mount_path.into(), None)
         .with_context(|| format!("Error mounting filesystem to {}", mount_path.display()))?;
 
     let boot_point = mount_path.join("boot");
@@ -29,7 +29,7 @@ pub fn mount<'a>(
     }
 
     mount_stack
-        .mount(&boot_filesystem, boot_point, None)
+        .mount(boot_filesystem, boot_point, None)
         .context("Error mounting the boot point")?;
 
     Ok(mount_stack)

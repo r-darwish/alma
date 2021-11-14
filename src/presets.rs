@@ -33,7 +33,7 @@ fn visit_dirs(dir: &Path, filevec: &mut Vec<PathBuf>) -> Result<(), io::Error> {
 impl Preset {
     fn load(path: &Path) -> anyhow::Result<Self> {
         let data = fs::read_to_string(path).with_context(|| format!("{}", path.display()))?;
-        Ok(toml::from_str(&data).with_context(|| format!("{}", path.display()))?)
+        toml::from_str(&data).with_context(|| format!("{}", path.display()))
     }
 
     fn process(
@@ -41,7 +41,7 @@ impl Preset {
         packages: &mut HashSet<String>,
         scripts: &mut Vec<Script>,
         environment_variables: &mut HashSet<String>,
-        path: &PathBuf,
+        path: &Path,
         aur_packages: &mut HashSet<String>,
     ) -> anyhow::Result<()> {
         if let Some(preset_packages) = &self.packages {
@@ -111,7 +111,7 @@ impl PresetsCollection {
                 // Build vector of paths to files, then sort by path name
                 // Recursively load directories of preset files
                 let mut dir_paths: Vec<PathBuf> = Vec::new();
-                visit_dirs(&preset, &mut dir_paths)
+                visit_dirs(preset, &mut dir_paths)
                     .with_context(|| format!("{}", preset.display()))?;
 
                 // Order not guaranteed so we sort
@@ -128,11 +128,11 @@ impl PresetsCollection {
                     )?;
                 }
             } else {
-                Preset::load(&preset)?.process(
+                Preset::load(preset)?.process(
                     &mut packages,
                     &mut scripts,
                     &mut environment_variables,
-                    &preset,
+                    preset,
                     &mut aur_packages,
                 )?;
             }
@@ -151,8 +151,8 @@ impl PresetsCollection {
 
         Ok(Self {
             packages,
-            scripts,
             aur_packages,
+            scripts,
         })
     }
 }

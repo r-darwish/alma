@@ -21,7 +21,7 @@ impl<'a> StorageDevice<'a> {
             .context("Error querying information about the block device")?;
         let device_name = path
             .file_name()
-            .and_then(|s| s.to_str())
+            .and_then(std::ffi::OsStr::to_str)
             .map(String::from)
             .ok_or_else(|| anyhow!("Invalid device name: {}", path.display()))?;
 

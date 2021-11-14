@@ -68,7 +68,7 @@ pub fn get_storage_devices(allow_non_removable: bool) -> anyhow::Result<Vec<Devi
                     .context("Could not parse block size to unsigned integer (u128)")?
                     * 512,
             ),
-        })
+        });
     }
 
     Ok(result)
