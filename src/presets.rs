@@ -151,8 +151,8 @@ impl PresetsCollection {
 
         Ok(Self {
             packages,
-            scripts,
             aur_packages,
+            scripts,
         })
     }
 }

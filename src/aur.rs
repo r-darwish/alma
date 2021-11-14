@@ -12,7 +12,7 @@ impl FromStr for AurHelper {
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
         match s {
-            "yay" => Ok(AurHelper {
+            "yay" => Ok(Self {
                 name: String::from("yay"),
                 package_name: String::from("yay-bin"),
                 install_command: vec![
