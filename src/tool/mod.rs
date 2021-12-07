@@ -2,6 +2,7 @@ mod chroot;
 mod mount;
 mod qemu;
 
+use anyhow::Context;
 pub use chroot::chroot;
 pub use mount::mount;
 pub use qemu::qemu;
@@ -17,7 +18,9 @@ pub struct Tool {
 
 impl Tool {
     pub fn find(name: &'static str) -> anyhow::Result<Self> {
-        Ok(Self { exec: which(name)? })
+        Ok(Self {
+            exec: which(name).context(format!("Cannot find {}", name))?,
+        })
     }
 
     pub fn execute(&self) -> Command {
