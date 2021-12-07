@@ -52,6 +52,10 @@ pub struct CreateCommand {
     #[structopt(long = "aur-packages", value_name = "aurpackage")]
     pub aur_packages: Vec<String>,
 
+    /// Boot partition size in megabytes
+    #[structopt(long = "boot-size")]
+    pub boot_size: Option<u32>,
+
     /// Enter interactive chroot before unmounting the drive
     #[structopt(short = "i", long = "interactive")]
     pub interactive: bool,
